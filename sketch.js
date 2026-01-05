@@ -1,9 +1,22 @@
 const WIDE_SCREEN_BREAKPOINT = 600;
 
+let uiContainer; // UI 的容器
+let uiContentH = 0; // UI 实际高度（自动测量）
+
+const UI_BASE_W = 320; // 你现在面板宽度基准
+const UI_MIN_SCALE = 0.3;
+const UI_MAX_SCALE = 1;
+
 // 用来存所有 UI 元素及其相对位置
 let uiElements = []; // { el, relX, relY }
 
 function registerUI(el, relX, relY) {
+  // 关键：把元素挂到 uiContainer 里
+  el.parent(uiContainer);
+
+  // 关键：元素在容器内部定位
+  el.position(relX, relY);
+
   uiElements.push({ el, relX, relY });
 }
 
@@ -14,7 +27,8 @@ const MOUTH_COUNT = 12;
 const CHEEK_COUNT = 10;
 const TOP_COUNT = 7;
 const BOTTOM_COUNT = 2;
-const SHOES_COUNT = 2;
+const SHOES_COUNT = 4;
+const SHOES_COLOR_COUNT = 2;
 
 // ==== 逻辑画布尺寸 & 人物位置（不随屏幕变）====
 const BASE_W = 1100;
@@ -63,7 +77,18 @@ let mouthImgs = [];
 let cheekImgs = [];
 let topImgs = [];
 let bottomImgs = [];
-let shoesImgs = [];
+// let shoesImgs = [];
+
+let rSlider, gSlider, bSlider;
+
+// 鞋子可调色（RGB）
+let shoeR = 200;
+let shoeG = 160;
+let shoeB = 90;
+
+// 鞋子分为“可上色层 + 线稿层”
+let shoesColorImgs = [];
+let shoesLineImgs = [];
 
 // 导出格式
 let exportFormatSelect;
@@ -73,6 +98,11 @@ let exportFormat = "png"; // 默认 png
 let scaleFactor = 1;
 let offsetX = 0;
 let offsetY = 0;
+
+let uiX = 0;
+let uiY = 0;
+let targetUiX = 0;
+let targetUiY = 0;
 
 function preload() {
   // 发型：hair1.png ~ hair8.png
@@ -135,10 +165,20 @@ function preload() {
     );
   }
 
-  // ★ 鞋子：shoes1.png ~ shoesN.png
+  // ★ 鞋子线稿：shoes1.png ~ shoes4.png
   for (let i = 0; i < SHOES_COUNT; i++) {
-    const path = `assets/body/shoes/shoes${i + 1}.png`;
-    shoesImgs[i] = loadImage(
+    const path = `assets/body/shoes/shoes_line/shoes${i + 1}.png`;
+    shoesLineImgs[i] = loadImage(
+      path,
+      () => console.log("loaded:", path),
+      (err) => console.error("FAILED to load:", path, err)
+    );
+  }
+
+  // ★ 鞋子颜色层：colors1.png ~ colors2.png
+  for (let i = 0; i < SHOES_COLOR_COUNT; i++) {
+    const path = `assets/body/shoes/shoes_fill/colors${i + 1}.png`;
+    shoesColorImgs[i] = loadImage(
       path,
       () => console.log("loaded:", path),
       (err) => console.error("FAILED to load:", path, err)
@@ -150,6 +190,9 @@ function setup() {
   // 画布大小 = 当前窗口大小（自适应）
   createCanvas(windowWidth, windowHeight);
 
+  pixelDensity(2); // 先写 2，mac/retina 会更细腻
+  smooth();
+
   background(245);
 
   createUI();
@@ -157,11 +200,19 @@ function setup() {
 }
 
 function createUI() {
+  uiContainer = createDiv();
+  uiContainer.style("position", "absolute");
+  uiContainer.style("left", "0px");
+  uiContainer.style("top", "0px");
+  uiContainer.style("width", "320px"); // 可选：给个面板宽度
+  uiContainer.style("transform-origin", "top left");
+  uiContainer.style("pointer-events", "auto");
+
   let y = 0; // 相对于 UI 面板原点的 y
   const x = 0; // 相对于 UI 面板原点的 x
 
   // 头部 - 发型
-  createUISectionTitle("头部 - 发型", x, y);
+  createUISectionTitle("发型 Hair", x, y);
   y += 30;
   createPrevNextButtons(
     "发型",
@@ -173,7 +224,7 @@ function createUI() {
   y += 40;
 
   // 头部 - 眼睛
-  createUISectionTitle("头部 - 眼睛", x, y);
+  createUISectionTitle("眼睛 Eyes", x, y);
   y += 30;
   createPrevNextButtons(
     "眼睛",
@@ -185,7 +236,7 @@ function createUI() {
   y += 40;
 
   // 头部 - 嘴型
-  createUISectionTitle("头部 - 嘴型", x, y);
+  createUISectionTitle("嘴型 Mouth", x, y);
   y += 30;
   createPrevNextButtons(
     "嘴型",
@@ -197,7 +248,7 @@ function createUI() {
   y += 40;
 
   // 头部 - 脸颊
-  createUISectionTitle("头部 - 脸颊", x, y);
+  createUISectionTitle("脸颊 Cheek", x, y);
   y += 30;
   createPrevNextButtons(
     "脸颊",
@@ -209,7 +260,7 @@ function createUI() {
   y += 40;
 
   // 上半身
-  createUISectionTitle("上半身", x, y);
+  createUISectionTitle("上半身 Upper Body", x, y);
   y += 30;
   createPrevNextButtons(
     "上衣",
@@ -221,7 +272,7 @@ function createUI() {
   y += 40;
 
   // 下半身
-  createUISectionTitle("下半身", x, y);
+  createUISectionTitle("下半身 Lower Body", x, y);
   y += 30;
   createPrevNextButtons(
     "下装",
@@ -233,7 +284,7 @@ function createUI() {
   y += 40;
 
   // 鞋子
-  createUISectionTitle("鞋子", x, y);
+  createUISectionTitle("鞋子 Shoes", x, y);
   y += 30;
   createPrevNextButtons(
     "鞋子",
@@ -244,14 +295,38 @@ function createUI() {
   );
   y += 50;
 
+  // —— 鞋子颜色（RGB）——
+  createUISectionTitle("鞋子颜色 Shoes Color (RGB)", x, y);
+  y += 30;
+
+  // R
+  rSlider = createSlider(0, 255, shoeR, 1);
+  rSlider.input(() => (shoeR = rSlider.value()));
+  registerUI(rSlider, x, y);
+  y += 30;
+
+  // G
+  gSlider = createSlider(0, 255, shoeG, 1);
+  gSlider.input(() => (shoeG = gSlider.value()));
+  registerUI(gSlider, x, y);
+  y += 30;
+
+  // B
+  bSlider = createSlider(0, 255, shoeB, 1);
+  bSlider.input(() => (shoeB = bSlider.value()));
+  registerUI(bSlider, x, y);
+  y += 40;
+
   // 随机按钮
-  let randBtn = createButton("随机一套");
+  let randBtn = createButton("随机一套 Random");
   randBtn.mousePressed(randomizeAvatar);
   registerUI(randBtn, x, y);
   y += 50;
 
   // 导出格式选择
-  createUISectionTitle("导出格式", x, y - 10);
+  createUISectionTitle("导出格式 Export Format", x, y);
+  y += 30;
+
   exportFormatSelect = createSelect();
   exportFormatSelect.option("png");
   exportFormatSelect.option("jpg");
@@ -259,24 +334,31 @@ function createUI() {
   exportFormatSelect.changed(() => {
     exportFormat = exportFormatSelect.value();
   });
-  registerUI(exportFormatSelect, x, y + 10);
+  registerUI(exportFormatSelect, x, y);
 
-  y += 60;
+  y += 50;
 
-  // 导出按钮：头部 / 半身 / 全身
-  createUISectionTitle("导出图片", x, y - 10);
+  // 导出图片
+  createUISectionTitle("导出图片 Export", x, y);
+  y += 30;
 
-  let headBtn = createButton("导出头部");
+  let headBtn = createButton("头部 Head");
   headBtn.mousePressed(() => exportAvatar("head"));
-  registerUI(headBtn, x, y + 10);
+  registerUI(headBtn, x, y);
 
-  let halfBtn = createButton("导出半身");
+  let halfBtn = createButton("半身 Half");
   halfBtn.mousePressed(() => exportAvatar("half"));
-  registerUI(halfBtn, x + 90, y + 10);
+  registerUI(halfBtn, x + 90, y);
 
-  let fullBtn = createButton("导出全身");
+  let fullBtn = createButton("全身 Full");
   fullBtn.mousePressed(() => exportAvatar("full"));
-  registerUI(fullBtn, x + 180, y + 10);
+  registerUI(fullBtn, x + 180, y);
+
+  y += 50;
+
+  uiContainer.style("height", y + "px");
+  uiContentH = y;
+  uiContainer.style("padding", "0px");
 }
 
 function createUISectionTitle(label, relX, relY) {
@@ -287,16 +369,43 @@ function createUISectionTitle(label, relX, relY) {
 }
 
 function createPrevNextButtons(label, relX, relY, onPrev, onNext) {
-  let span = createSpan(label + "：");
-  registerUI(span, relX, relY + 5);
-
   let prevBtn = createButton("◀");
   prevBtn.mousePressed(onPrev);
-  registerUI(prevBtn, relX + 60, relY);
+  styleArrowButton(prevBtn);
+  registerUI(prevBtn, relX, relY);
 
   let nextBtn = createButton("▶");
   nextBtn.mousePressed(onNext);
-  registerUI(nextBtn, relX + 100, relY);
+  styleArrowButton(nextBtn);
+  registerUI(nextBtn, relX + 44, relY);
+}
+
+function styleArrowButton(btn) {
+  btn.style("width", "40px");
+  btn.style("height", "32px");
+  btn.style("padding", "0");
+  btn.style("border", "3px solid #111");
+  btn.style("border-radius", "5px");
+  btn.style("background", "#fff");
+  btn.style("color", "#111");
+  btn.style("cursor", "pointer");
+  btn.style("display", "flex");
+  btn.style("align-items", "center"); // 垂直居中
+  btn.style("justify-content", "center"); // 水平居中
+  btn.style("font-size", "16px");
+  btn.style("text-align", "center");
+  btn.style("box-shadow", "0");
+  btn.style("transition", "all 140ms ease");
+
+  btn.mouseOver(() => {
+    btn.style("background", "#111");
+    btn.style("color", "#fff");
+  });
+
+  btn.mouseOut(() => {
+    btn.style("background", "#fff");
+    btn.style("color", "#111");
+  });
 }
 
 // 切换某个部件的 index
@@ -339,6 +448,14 @@ function randomizeAvatar() {
   currentTop = floor(random(TOP_COUNT));
   currentBottom = floor(random(BOTTOM_COUNT));
   currentShoes = floor(random(SHOES_COUNT));
+  // ✅ 随机鞋子颜色（RGB）
+  shoeR = floor(random(256));
+  shoeG = floor(random(256));
+  shoeB = floor(random(256));
+  // ✅ 同步滑条 UI
+  if (rSlider) rSlider.value(shoeR);
+  if (gSlider) gSlider.value(shoeG);
+  if (bSlider) bSlider.value(shoeB);
 }
 
 function draw() {
@@ -346,10 +463,10 @@ function draw() {
 
   // 根据当前窗口计算缩放和偏移，让 BASE_W x BASE_H 适配屏幕
   scaleFactor = min(width / BASE_W, height / BASE_H);
-  const drawW = BASE_W * scaleFactor;
-  const drawH = BASE_H * scaleFactor;
-  offsetX = (width - drawW) / 2;
-  offsetY = (height - drawH) / 2;
+  const drawW = Math.round(BASE_W * scaleFactor);
+  const drawH = Math.round(BASE_H * scaleFactor);
+  offsetX = Math.round((width - drawW) / 2);
+  offsetY = Math.round((height - drawH) / 2);
 
   push();
   translate(offsetX, offsetY);
@@ -365,24 +482,64 @@ function draw() {
 }
 
 function layoutUI() {
-  if (uiElements.length === 0) return;
+  if (!uiContainer) return;
 
   const margin = 20;
-
-  // 人物顶部（头像上方略留一点边距）
-  const avatarTopScreen = offsetY + (AVATAR_HEAD_TOP_Y - 10) * scaleFactor;
-
-  // 人物右侧的 x 坐标（黑框最右附近），这里简单用 BASE_W 的一部分估算
-  const avatarRightScreen = offsetX + 420 * scaleFactor; // 250 中心 + 288/2 + 一点余量
+  const avatarRightScreen = offsetX + 420 * scaleFactor;
 
   let panelX, panelY;
 
+  // ===== UI 自适应缩放 =====
+
+  let availableH, availableW;
+
   if (width > WIDE_SCREEN_BREAKPOINT) {
-    // 宽屏：UI 放在人物右边，顶部对齐
-    panelX = avatarRightScreen + margin;
-    panelY = avatarTopScreen;
+    availableH = height - 40;
+    availableW = width - (avatarRightScreen + margin) - 40;
   } else {
-    // 窄屏：UI 放在人物下面，从左侧开始
+    availableH = height - 40;
+    availableW = width - 2 * margin;
+  }
+
+  // ✅ 防止负数导致缩放跳变
+  availableW = max(0, availableW);
+  availableH = max(0, availableH);
+
+  let sH = uiContentH > 0 ? availableH / uiContentH : 1;
+  let sW = UI_BASE_W > 0 ? availableW / UI_BASE_W : 1;
+
+  let uiScale = min(sH, sW);
+
+  // ✅ 用你上面的常量
+  uiScale = constrain(uiScale, UI_MIN_SCALE, UI_MAX_SCALE);
+  uiScale = Math.round(uiScale * 100) / 100;
+
+  uiContainer.style("transform", `scale(${uiScale})`);
+
+  if (width > WIDE_SCREEN_BREAKPOINT) {
+    // 1) UI 放右侧
+    panelX = avatarRightScreen + margin;
+
+    // 2) 算人物中心 Y（和 drawAvatar 同一套定位）
+    const headY = AVATAR_HEAD_TOP_Y;
+    const SEAM_FIX = 8;
+
+    const topY = headY + HEAD_H - SEAM_FIX;
+    const bottomY = topY + BODY_TOP_H - SEAM_FIX;
+    const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
+
+    const avatarTopScreenReal = offsetY + headY * scaleFactor;
+    const avatarBottomScreenReal = offsetY + (shoesY + SHOES_H) * scaleFactor;
+    const avatarCenterY = (avatarTopScreenReal + avatarBottomScreenReal) / 2;
+
+    // 3) 用缩放后的 UI 高度来居中
+    const scaledUIH = uiContentH * uiScale;
+    panelY = avatarCenterY - scaledUIH / 2;
+
+    // 4) 防止 UI 掉出屏幕
+    panelY = constrain(panelY, 20, height - scaledUIH - 20);
+  } else {
+    // 窄屏：UI 放人物下面
     panelX = margin;
     const avatarBottomScreen =
       offsetY +
@@ -391,108 +548,86 @@ function layoutUI() {
     panelY = avatarBottomScreen + margin;
   }
 
-  // 按相对偏移重新布局所有 UI 元素
-  for (const item of uiElements) {
-    item.el.position(panelX + item.relX, panelY + item.relY);
-  }
+  // 位置取整，避免子像素抖动
+  panelX = Math.round(panelX);
+  panelY = Math.round(panelY);
+
+  // ===== lerp 平滑 UI 位置（防跳、防硬切）=====
+  targetUiX = panelX;
+  targetUiY = panelY;
+
+  // lerp 平滑跟随
+  uiX = lerp(uiX, targetUiX, 0.15);
+  uiY = lerp(uiY, targetUiY, 0.15);
+
+  // 防止子像素抖动
+  uiContainer.position(Math.round(uiX), Math.round(uiY));
 }
 
 // 画整个人物（头 + 身体）
 function drawAvatar() {
+  // ===== 基础定位 =====
   const headX = AVATAR_CENTER_X - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
+  // 消缝：让下一个区块往上盖住 8px
+  const SEAM_FIX = 8;
+
+  // 身体位置（新2头身）
   const topX = AVATAR_CENTER_X - BODY_TOP_W / 2;
-  const topY = headY + HEAD_H;
+  const topY = headY + HEAD_H - SEAM_FIX;
 
   const bottomX = AVATAR_CENTER_X - BODY_BOTTOM_W / 2;
-  const bottomY = topY + BODY_TOP_H;
+  const bottomY = topY + BODY_TOP_H - SEAM_FIX;
 
+  // 鞋子宽 216，需要以人物中心对齐
   const shoesX = AVATAR_CENTER_X - SHOES_W / 2;
-  const shoesY = bottomY + BODY_BOTTOM_H;
+  const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
-  // ==== 整体外框（黑线包裹整个人）====
-  push();
-  noFill();
-  stroke(0);
-  strokeWeight(4);
+  // ===== 身体（只画素材，不画区块线框）=====
+  const topImg = topImgs[currentTop];
+  if (topImg) image(topImg, topX, topY, BODY_TOP_W, BODY_TOP_H);
 
-  const margin = 20;
-  const left = min(headX, topX, bottomX, shoesX) - margin;
-  const right =
-    max(
-      headX + HEAD_W,
-      topX + BODY_TOP_W,
-      bottomX + BODY_BOTTOM_W,
-      shoesX + SHOES_W
-    ) + margin;
-  const top = headY - margin;
-  const bottom = shoesY + SHOES_H + margin;
-  const frameW = right - left;
-  const frameH = bottom - top;
-
-  rect(left, top, frameW, frameH, 20);
-  pop();
-
-  // ==== 身体 ====
-  // 下半身外框
-  push();
-  stroke(0, BLOCK_STROKE_ALPHA);
-  strokeWeight(BLOCK_STROKE);
-  noFill();
-  rect(bottomX, bottomY, BODY_BOTTOM_W, BODY_BOTTOM_H, 15);
-
-  // 画下装图片（贴合区块）
   const bottomImg = bottomImgs[currentBottom];
   if (bottomImg)
     image(bottomImg, bottomX, bottomY, BODY_BOTTOM_W, BODY_BOTTOM_H);
 
-  pop();
+  // currentShoes: 0~3 代表 shoes1~4
+  const lineImg = shoesLineImgs[currentShoes];
 
-  // 鞋子外框
-  push();
-  stroke(0, BLOCK_STROKE_ALPHA);
-  strokeWeight(BLOCK_STROKE);
-  noFill();
-  rect(shoesX, shoesY, SHOES_W, SHOES_H, 10);
+  // shoes1-2 -> colors1, shoes3-4 -> colors2
+  const colorIndex = currentShoes < 2 ? 0 : 1;
+  const fillImg = shoesColorImgs[colorIndex];
 
-  // 画鞋子图片
-  const shoesImg = shoesImgs[currentShoes];
-  if (shoesImg) image(shoesImg, shoesX, shoesY, SHOES_W, SHOES_H);
+  // 先画可上色的 fill（底层）
+  if (fillImg) {
+    push();
+    tint(shoeR, shoeG, shoeB); // 这里用你 RGB 滑条变量
+    image(fillImg, shoesX, shoesY, SHOES_W, SHOES_H);
+    pop();
+  }
 
-  pop();
+  // 再画线稿 line（最上层）
+  if (lineImg) {
+    image(lineImg, shoesX, shoesY, SHOES_W, SHOES_H);
+  }
 
-  // 上半身外框
-  push();
-  stroke(0, BLOCK_STROKE_ALPHA);
-  strokeWeight(BLOCK_STROKE);
-  noFill();
-  rect(topX, topY, BODY_TOP_W, BODY_TOP_H, 20);
+  // ===== 头部贴图（顺序决定图层）=====
+  // 嘴（最底）
+  const mouthImg = mouthImgs[currentMouth];
+  if (mouthImg) image(mouthImg, headX, headY, HEAD_W, HEAD_H);
 
-  // 画上衣图片
-  const topImg = topImgs[currentTop];
-  if (topImg) image(topImg, topX, topY, BODY_TOP_W, BODY_TOP_H);
+  // 头发
+  const hairImg = hairImgs[currentHair];
+  if (hairImg) image(hairImg, headX, headY, HEAD_W, HEAD_H);
 
-  pop();
+  // 脸颊
+  const cheekImg = cheekImgs[currentCheek];
+  if (cheekImg) image(cheekImg, headX, headY, HEAD_W, HEAD_H);
 
-  // ==== 头部 ====
-  push();
-  noStroke();
-  fill(255);
-  rect(headX, headY, HEAD_W, HEAD_H, HEAD_RADIUS);
-  pop();
-
-  // ★ 2. 头发
-  drawHair(headX, headY);
-
-  // ★ 1. 脸颊
-  drawCheek(headX, headY);
-
-  // ★ 4. 嘴巴
-  drawMouth(headX, headY);
-
-  // ★ 3. 眼睛
-  drawEyes(headX, headY);
+  // 眼睛（最上）
+  const eyesImg = eyesImgs[currentEyes];
+  if (eyesImg) image(eyesImg, headX, headY, HEAD_W, HEAD_H);
 }
 
 // 头发
@@ -521,7 +656,7 @@ function drawMouth(headX, headY) {
   }
 }
 
-// 脸颊（用 PNG 画）
+// 脸颊
 function drawCheek(headX, headY) {
   const img = cheekImgs[currentCheek];
   if (img) {
@@ -535,14 +670,16 @@ function exportAvatar(mode) {
   const headX = AVATAR_CENTER_X - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
+  const SEAM_FIX = 2;
+
   const topX = AVATAR_CENTER_X - BODY_TOP_W / 2;
-  const topY = headY + HEAD_H;
+  const topY = headY + HEAD_H - SEAM_FIX;
 
   const bottomX = AVATAR_CENTER_X - BODY_BOTTOM_W / 2;
-  const bottomY = topY + BODY_TOP_H;
+  const bottomY = topY + BODY_TOP_H - SEAM_FIX;
 
   const shoesX = AVATAR_CENTER_X - SHOES_W / 2;
-  const shoesY = bottomY + BODY_BOTTOM_H;
+  const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
   let x, y, w, h;
 
