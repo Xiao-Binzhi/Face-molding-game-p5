@@ -31,8 +31,11 @@ const SHOES_COUNT = 4;
 const SHOES_COLOR_COUNT = 2;
 
 // ==== 逻辑画布尺寸 & 人物位置（不随屏幕变）====
-const BASE_W = 1100;
-const BASE_H = 750;
+const BASE_W_DESKTOP = 1100;
+const BASE_H_DESKTOP = 750;
+
+const BASE_W_MOBILE = 520;
+const BASE_H_MOBILE = 750;
 
 // 头像 / 身体的尺寸（按你要求）
 const HEAD_W = 288;
@@ -462,9 +465,16 @@ function draw() {
   background(245);
 
   // 根据当前窗口计算缩放和偏移，让 BASE_W x BASE_H 适配屏幕
-  scaleFactor = min(width / BASE_W, height / BASE_H);
-  const drawW = Math.round(BASE_W * scaleFactor);
-  const drawH = Math.round(BASE_H * scaleFactor);
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+
+  const baseW = isMobile ? BASE_W_MOBILE : BASE_W_DESKTOP;
+  const baseH = isMobile ? BASE_H_MOBILE : BASE_H_DESKTOP;
+
+  scaleFactor = min(width / baseW, height / baseH);
+
+  const drawW = Math.round(baseW * scaleFactor);
+  const drawH = Math.round(baseH * scaleFactor);
+
   offsetX = Math.round((width - drawW) / 2);
   offsetY = Math.round((height - drawH) / 2);
 
@@ -566,22 +576,25 @@ function layoutUI() {
 
 // 画整个人物（头 + 身体）
 function drawAvatar() {
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+  const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
+
   // ===== 基础定位 =====
-  const headX = AVATAR_CENTER_X - HEAD_W / 2;
+  const headX = centerX - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
   // 消缝：让下一个区块往上盖住 8px
   const SEAM_FIX = 8;
 
   // 身体位置（新2头身）
-  const topX = AVATAR_CENTER_X - BODY_TOP_W / 2;
+  const topX = centerX - BODY_TOP_W / 2;
   const topY = headY + HEAD_H - SEAM_FIX;
 
-  const bottomX = AVATAR_CENTER_X - BODY_BOTTOM_W / 2;
+  const bottomX = centerX - BODY_BOTTOM_W / 2;
   const bottomY = topY + BODY_TOP_H - SEAM_FIX;
 
   // 鞋子宽 216，需要以人物中心对齐
-  const shoesX = AVATAR_CENTER_X - SHOES_W / 2;
+  const shoesX = centerX - SHOES_W / 2;
   const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
   // ===== 身体（只画素材，不画区块线框）=====
