@@ -434,9 +434,11 @@ function createUI() {
   // 导出组
   // ======================
   const exportGroup = beginGroupBox();
+  const TITLE_TO_CONTROL_Y = 28; // 小标题到控件的距离
+  const CONTROL_TO_NEXT_Y = 40; // 控件到下一段的距离
 
   createUISectionTitle("导出格式 Export Format", x, y);
-  y += 30;
+  y += TITLE_TO_CONTROL_Y;
 
   exportFormatSelect = createSelect();
   exportFormatSelect.option("png");
@@ -446,10 +448,10 @@ function createUI() {
     exportFormat = exportFormatSelect.value();
   });
   registerUI(exportFormatSelect, x, y);
-  y += 30;
+  y += CONTROL_TO_NEXT_Y;
 
   createUISectionTitle("导出图片 Export", x, y);
-  y += 30;
+  y += TITLE_TO_CONTROL_Y;
 
   exportHeadBtn = createButton("头部 Head");
   exportHeadBtn.mousePressed(() => exportAvatar("head"));
@@ -461,9 +463,9 @@ function createUI() {
 
   exportFullBtn = createButton("全身 Full");
   exportFullBtn.mousePressed(() => exportAvatar("full"));
-  registerUI(exportFullBtn, x + 172, y);
+  registerUI(exportFullBtn, x + 180, y);
 
-  y += 30;
+  y += CONTROL_TO_NEXT_Y;
 
   endGroupBox(exportGroup);
 
@@ -589,7 +591,7 @@ function styleRandomButton(btn) {
 }
 
 function styleExportButton(btn, isMobile) {
-  btn.style("height", isMobile ? "36px" : "32px");
+  btn.style("height", isMobile ? "32px" : "32px");
   btn.style("width", isMobile ? "88px" : "84px"); // ✅ 按想要的改
   btn.style("padding", "0");
   btn.style("border", "3px solid #111");
@@ -605,7 +607,7 @@ function styleExportButton(btn, isMobile) {
 }
 
 function styleExportSelect(sel, isMobile) {
-  sel.style("height", isMobile ? "36px" : "32px");
+  sel.style("height", isMobile ? "30px" : "32px");
   sel.style("width", isMobile ? "120px" : "110px"); // ✅ 下拉框宽度
   sel.style("padding", "0 10px");
   sel.style("border", "3px solid #111");
