@@ -1,4 +1,4 @@
-const WIDE_SCREEN_BREAKPOINT = 600;
+const WIDE_SCREEN_BREAKPOINT = 700;
 
 let uiContainer; // UI 的容器
 let uiContentH = 0; // UI 实际高度（自动测量）
@@ -6,16 +6,49 @@ let uiContentH = 0; // UI 实际高度（自动测量）
 const UI_BASE_W = 320; // 你现在面板宽度基准
 const UI_MIN_SCALE = 0.3;
 const UI_MAX_SCALE = 1;
+const UI_BOTTOM_BOOST = 1.18; // UI到下面时额外放大（1.1~1.25）
+const UI_MAX_SCALE_BOTTOM = 1.25; // UI在下面允许放大到多少
+
+let exportHeadBtn, exportHalfBtn, exportFullBtn;
+
+let drawerShell, drawerPanel, drawerHandle;
+let isDrawerOpen = true; // 默认打开（你也可以改成 false）
+let lastIsMobile = null; // 用来检测屏幕模式切换
+
+const MOBILE_DRAWER_H_RATIO = 0.42; // 手机抽屉占屏高度比例（0.35~0.5）
+const MOBILE_DRAWER_MARGIN = 12; // 抽屉离屏幕边缘的间距
+const MOBILE_DRAWER_RADIUS = 16; // 抽屉圆角
+
+let randBtn;
 
 // 用来存所有 UI 元素及其相对位置
 let uiElements = []; // { el, relX, relY }
 
+let groupBoxes = []; // 记录所有黑框
+let uiBaseX = 4; // 当前框整体的左偏移（桌面默认 4）
+
+function applyUIBaseX(newBaseX) {
+  uiBaseX = Math.max(0, Math.round(newBaseX));
+
+  // 移动所有框
+  for (const b of groupBoxes) {
+    b.box.position(uiBaseX, b.relY);
+  }
+
+  // 移动所有 UI 元素
+  for (const u of uiElements) {
+    u.el.position(uiBaseX + u.relX, u.relY);
+  }
+}
+
 function registerUI(el, relX, relY) {
-  // 关键：把元素挂到 uiContainer 里
+  // 把元素挂到 uiContainer 里
   el.parent(uiContainer);
 
-  // 关键：元素在容器内部定位
-  el.position(relX, relY);
+  // 元素在容器内部定位
+  el.position(uiBaseX + relX, relY);
+
+  el.style("z-index", "1"); // 永远在分组框上面
 
   uiElements.push({ el, relX, relY });
 }
@@ -61,9 +94,6 @@ const BLOCK_STROKE_ALPHA = 0; // 0=完全透明，255=完全可见
 const AVATAR_CENTER_X = 250;
 const AVATAR_HEAD_TOP_Y = 80;
 
-// UI 起始 x，根据屏幕宽度在 setup 里决定
-let UI_START_X;
-
 // ==== 当前选择的 index ====
 let currentHair = 0;
 let currentEyes = 0;
@@ -97,7 +127,9 @@ let shoesLineImgs = [];
 let exportFormatSelect;
 let exportFormat = "png"; // 默认 png
 
-// 当前缩放信息（导出要用）
+// 当前缩放信息
+const DESKTOP_FIXED_SCALE = 1.36;
+const MOBILE_AVATAR_AREA_RATIO = 0.65; // 窄屏：人物占屏幕高度比例（0.5~0.65）
 let scaleFactor = 1;
 let offsetX = 0;
 let offsetY = 0;
@@ -199,7 +231,36 @@ function setup() {
   background(245);
 
   createUI();
+  createDrawer();
   randomizeAvatar();
+}
+
+function createUIGroupTitle(label, relX, relY) {
+  let p = createP(label);
+  p.style("margin", "10px 0 0 0");
+  p.style("font-weight", "800");
+  p.style("font-size", "14px");
+  registerUI(p, relX, relY);
+}
+
+function createGroupBox(relX, relY, w, h) {
+  const box = createDiv();
+  box.parent(uiContainer);
+  box.style("position", "absolute");
+  box.style("background", "#fff");
+  box.style("border", "3px solid #111");
+  box.style("border-radius", "12px");
+  box.style("box-sizing", "border-box");
+  box.style("z-index", "0"); // ✅ 在最底层
+
+  // ✅ 也用 uiBaseX 偏移
+  box.position(uiBaseX + relX, relY);
+  box.size(w, h);
+
+  // ✅ 记录：之后窄屏时用来居中
+  groupBoxes.push({ box, relY });
+
+  return box;
 }
 
 function createUI() {
@@ -207,14 +268,57 @@ function createUI() {
   uiContainer.style("position", "absolute");
   uiContainer.style("left", "0px");
   uiContainer.style("top", "0px");
-  uiContainer.style("width", "320px"); // 可选：给个面板宽度
+  uiContainer.style("width", UI_BASE_W + "px");
   uiContainer.style("transform-origin", "top left");
   uiContainer.style("pointer-events", "auto");
 
-  let y = 0; // 相对于 UI 面板原点的 y
-  const x = 0; // 相对于 UI 面板原点的 x
+  // 如果你还在用抽屉滚动，这些保留没问题
+  uiContainer.style("overflow-y", "auto");
+  uiContainer.style("overflow-x", "hidden");
+  uiContainer.style("-webkit-overflow-scrolling", "touch");
 
-  // 头部 - 发型
+  // ✅ 很关键：每次重建 UI 先清空记录，避免旧框/旧元素残留导致位置错乱
+  uiElements = [];
+  groupBoxes = [];
+  applyUIBaseX(4); // ✅ 宽屏默认整体左边距（你想调宽屏贴左/更靠右，就改这里）
+
+  // ===== 可调参数（你后续想改间距就改这几个）=====
+  const BOX_PAD_Y = 12; // 框内上下留白（越大越松）
+  const BOX_PAD_X = 18; // 框内左边距（内容离框左边的距离）
+  const GROUP_GAP = 18; // 框与框之间的距离（越大越松）
+  const BOX_W = UI_BASE_W - 8; // 黑框宽度（保持不变，窄屏会自动居中）
+
+  const x = BOX_PAD_X; // 内容相对“框左边”的 x（不要写死绝对像素）
+
+  // ===== y 从 0 开始往下排 =====
+  let y = 0;
+
+  // 一个小工具：开始一个分组框
+  function beginGroupBox() {
+    const boxTop = y;
+    const box = createGroupBox(0, boxTop, BOX_W, 10); // relX 一律用 0
+    y = boxTop + BOX_PAD_Y; // 内容从框内开始（带上内边距）
+    return { box, boxTop, contentTop: y };
+  }
+
+  // 一个小工具：结束一个分组框（回填高度，并把 y 移到下一组起点）
+  function endGroupBox(g) {
+    const contentEnd = y;
+    const boxH = contentEnd - g.contentTop + BOX_PAD_Y * 2;
+
+    // 注意：X 统一由 uiBaseX 控制，所以这里 position 用 uiBaseX
+    g.box.position(uiBaseX, g.boxTop);
+    g.box.size(BOX_W, boxH);
+
+    // 下一组起点 = 当前框底部 + 组间距
+    y = g.boxTop + boxH + GROUP_GAP;
+  }
+
+  // ======================
+  // 头部组
+  // ======================
+  const headGroup = beginGroupBox();
+
   createUISectionTitle("发型 Hair", x, y);
   y += 30;
   createPrevNextButtons(
@@ -226,7 +330,6 @@ function createUI() {
   );
   y += 40;
 
-  // 头部 - 眼睛
   createUISectionTitle("眼睛 Eyes", x, y);
   y += 30;
   createPrevNextButtons(
@@ -238,7 +341,6 @@ function createUI() {
   );
   y += 40;
 
-  // 头部 - 嘴型
   createUISectionTitle("嘴型 Mouth", x, y);
   y += 30;
   createPrevNextButtons(
@@ -250,7 +352,6 @@ function createUI() {
   );
   y += 40;
 
-  // 头部 - 脸颊
   createUISectionTitle("脸颊 Cheek", x, y);
   y += 30;
   createPrevNextButtons(
@@ -262,7 +363,13 @@ function createUI() {
   );
   y += 40;
 
-  // 上半身
+  endGroupBox(headGroup);
+
+  // ======================
+  // 身体组
+  // ======================
+  const bodyGroup = beginGroupBox();
+
   createUISectionTitle("上半身 Upper Body", x, y);
   y += 30;
   createPrevNextButtons(
@@ -274,7 +381,6 @@ function createUI() {
   );
   y += 40;
 
-  // 下半身
   createUISectionTitle("下半身 Lower Body", x, y);
   y += 30;
   createPrevNextButtons(
@@ -286,7 +392,13 @@ function createUI() {
   );
   y += 40;
 
-  // 鞋子
+  endGroupBox(bodyGroup);
+
+  // ======================
+  // 鞋子组
+  // ======================
+  const shoesGroup = beginGroupBox();
+
   createUISectionTitle("鞋子 Shoes", x, y);
   y += 30;
   createPrevNextButtons(
@@ -298,35 +410,31 @@ function createUI() {
   );
   y += 50;
 
-  // —— 鞋子颜色（RGB）——
   createUISectionTitle("鞋子颜色 Shoes Color (RGB)", x, y);
   y += 30;
 
-  // R
   rSlider = createSlider(0, 255, shoeR, 1);
   rSlider.input(() => (shoeR = rSlider.value()));
   registerUI(rSlider, x, y);
   y += 30;
 
-  // G
   gSlider = createSlider(0, 255, shoeG, 1);
   gSlider.input(() => (shoeG = gSlider.value()));
   registerUI(gSlider, x, y);
   y += 30;
 
-  // B
   bSlider = createSlider(0, 255, shoeB, 1);
   bSlider.input(() => (shoeB = bSlider.value()));
   registerUI(bSlider, x, y);
-  y += 40;
+  y += 30;
 
-  // 随机按钮
-  let randBtn = createButton("随机一套 Random");
-  randBtn.mousePressed(randomizeAvatar);
-  registerUI(randBtn, x, y);
-  y += 50;
+  endGroupBox(shoesGroup);
 
-  // 导出格式选择
+  // ======================
+  // 导出组
+  // ======================
+  const exportGroup = beginGroupBox();
+
   createUISectionTitle("导出格式 Export Format", x, y);
   y += 30;
 
@@ -338,30 +446,72 @@ function createUI() {
     exportFormat = exportFormatSelect.value();
   });
   registerUI(exportFormatSelect, x, y);
+  y += 30;
 
-  y += 50;
-
-  // 导出图片
   createUISectionTitle("导出图片 Export", x, y);
   y += 30;
 
-  let headBtn = createButton("头部 Head");
-  headBtn.mousePressed(() => exportAvatar("head"));
-  registerUI(headBtn, x, y);
+  exportHeadBtn = createButton("头部 Head");
+  exportHeadBtn.mousePressed(() => exportAvatar("head"));
+  registerUI(exportHeadBtn, x, y);
 
-  let halfBtn = createButton("半身 Half");
-  halfBtn.mousePressed(() => exportAvatar("half"));
-  registerUI(halfBtn, x + 90, y);
+  exportHalfBtn = createButton("半身 Half");
+  exportHalfBtn.mousePressed(() => exportAvatar("half"));
+  registerUI(exportHalfBtn, x + 90, y);
 
-  let fullBtn = createButton("全身 Full");
-  fullBtn.mousePressed(() => exportAvatar("full"));
-  registerUI(fullBtn, x + 180, y);
+  exportFullBtn = createButton("全身 Full");
+  exportFullBtn.mousePressed(() => exportAvatar("full"));
+  registerUI(exportFullBtn, x + 172, y);
 
-  y += 50;
+  y += 30;
 
+  endGroupBox(exportGroup);
+
+  // ======================
+  // 浮动随机按钮（不放进框）
+  // ======================
+  randBtn = createButton("随机 Random");
+  randBtn.mousePressed(randomizeAvatar);
+  styleRandomButton(randBtn);
+
+  // ✅ UI 实际高度：layoutUI() 的缩放/居中要用它
   uiContainer.style("height", y + "px");
   uiContentH = y;
   uiContainer.style("padding", "0px");
+}
+
+function createDrawer() {
+  drawerShell = createDiv();
+  drawerShell.style("position", "fixed");
+  drawerShell.style("left", "0");
+  drawerShell.style("bottom", "0");
+  drawerShell.style("width", "100vw");
+  drawerShell.style("pointer-events", "none"); // 让里面的 panel 接管点击
+  drawerShell.hide();
+
+  drawerPanel = createDiv();
+  drawerPanel.parent(drawerShell);
+  drawerPanel.style("position", "absolute");
+  drawerPanel.style("left", "50%");
+  drawerPanel.style("transform", "translateX(-50%)");
+  drawerPanel.style("pointer-events", "auto");
+  drawerPanel.style("background", "#fff");
+  drawerPanel.style("border", "3px solid #111");
+  drawerPanel.style("border-radius", "16px 16px 0 0");
+  drawerPanel.style("box-sizing", "border-box");
+
+  drawerHandle = createDiv();
+  drawerHandle.parent(drawerPanel);
+  drawerHandle.style("width", "44px");
+  drawerHandle.style("height", "6px");
+  drawerHandle.style("border-radius", "99px");
+  drawerHandle.style("background", "#000000ff");
+  drawerHandle.style("margin", "10px auto 8px auto");
+  drawerHandle.style("cursor", "pointer");
+
+  drawerHandle.mousePressed(() => {
+    isDrawerOpen = !isDrawerOpen;
+  });
 }
 
 function createUISectionTitle(label, relX, relY) {
@@ -409,6 +559,63 @@ function styleArrowButton(btn) {
     btn.style("background", "#fff");
     btn.style("color", "#111");
   });
+}
+
+function styleRandomButton(btn) {
+  btn.style("height", "48px");
+  btn.style("width", "120px");
+  btn.style("padding", "0 12px");
+  btn.style("border", "3px solid #111");
+  btn.style("border-radius", "5px");
+  btn.style("background", "#fff");
+  btn.style("color", "#111");
+  btn.style("cursor", "pointer");
+  btn.style("display", "flex");
+  btn.style("align-items", "center");
+  btn.style("justify-content", "center");
+  btn.style("font-size", "14px");
+  btn.style("font-weight", "600");
+  btn.style("transition", "all 140ms ease");
+  btn.style("z-index", "9999");
+
+  btn.mouseOver(() => {
+    btn.style("background", "#111");
+    btn.style("color", "#fff");
+  });
+  btn.mouseOut(() => {
+    btn.style("background", "#fff");
+    btn.style("color", "#111");
+  });
+}
+
+function styleExportButton(btn, isMobile) {
+  btn.style("height", isMobile ? "36px" : "32px");
+  btn.style("width", isMobile ? "88px" : "84px"); // ✅ 按想要的改
+  btn.style("padding", "0");
+  btn.style("border", "3px solid #111");
+  btn.style("border-radius", "8px");
+  btn.style("background", "#fff");
+  btn.style("color", "#111");
+  btn.style("cursor", "pointer");
+  btn.style("font-size", isMobile ? "13px" : "12px");
+  btn.style("font-weight", "600");
+  btn.style("display", "flex");
+  btn.style("align-items", "center");
+  btn.style("justify-content", "center");
+}
+
+function styleExportSelect(sel, isMobile) {
+  sel.style("height", isMobile ? "36px" : "32px");
+  sel.style("width", isMobile ? "120px" : "110px"); // ✅ 下拉框宽度
+  sel.style("padding", "0 10px");
+  sel.style("border", "3px solid #111");
+  sel.style("border-radius", "8px");
+  sel.style("background", "#fff");
+  sel.style("color", "#111");
+  sel.style("font-size", isMobile ? "13px" : "12px");
+  sel.style("font-weight", "600");
+  sel.style("outline", "none");
+  sel.style("box-sizing", "border-box");
 }
 
 // 切换某个部件的 index
@@ -462,56 +669,166 @@ function randomizeAvatar() {
 }
 
 function draw() {
-  background(245);
+  background(255);
 
-  // 根据当前窗口计算缩放和偏移，让 BASE_W x BASE_H 适配屏幕
   const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
 
   const baseW = isMobile ? BASE_W_MOBILE : BASE_W_DESKTOP;
   const baseH = isMobile ? BASE_H_MOBILE : BASE_H_DESKTOP;
 
-  scaleFactor = min(width / baseW, height / baseH);
+  let fitScale;
 
-  const drawW = Math.round(baseW * scaleFactor);
-  const drawH = Math.round(baseH * scaleFactor);
+  if (!isMobile) {
+    // ===== 宽屏：用整个屏幕 fit =====
+    fitScale = min(width / baseW, height / baseH);
 
-  offsetX = Math.round((width - drawW) / 2);
-  offsetY = Math.round((height - drawH) / 2);
+    // 固定 1.36，但屏幕装不下就缩小
+    scaleFactor = min(DESKTOP_FIXED_SCALE, fitScale);
+
+    const drawW = Math.round(baseW * scaleFactor);
+    const drawH = Math.round(baseH * scaleFactor);
+
+    offsetX = Math.round((width - drawW) / 2);
+    offsetY = Math.round((height - drawH) / 2);
+  } else {
+    // ===== 窄屏：人物只用“上半区域” fit，避免被抽屉挡住 =====
+    const avatarAreaH = height * MOBILE_AVATAR_AREA_RATIO;
+
+    fitScale = min(width / baseW, avatarAreaH / baseH);
+    scaleFactor = fitScale;
+
+    const drawW = Math.round(baseW * scaleFactor);
+    const drawH = Math.round(baseH * scaleFactor);
+
+    offsetX = Math.round((width - drawW) / 2);
+
+    // 注意：这里是“在 avatarAreaH 内居中”，不是在整个 height 内居中
+    offsetY = Math.round((avatarAreaH - drawH) / 2);
+  }
 
   push();
   translate(offsetX, offsetY);
   scale(scaleFactor);
-
-  // 在逻辑坐标系里画人物
   drawAvatar();
-
   pop();
 
-  // 画完人物后，再根据最新的 offset/scale 布局 UI
   layoutUI();
 }
 
 function layoutUI() {
   if (!uiContainer) return;
 
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+
+  // ✅ 每帧/每次布局都按当前模式刷新导出控件尺寸
+  if (exportFormatSelect) styleExportSelect(exportFormatSelect, isMobile);
+  if (exportHeadBtn) styleExportButton(exportHeadBtn, isMobile);
+  if (exportHalfBtn) styleExportButton(exportHalfBtn, isMobile);
+  if (exportFullBtn) styleExportButton(exportFullBtn, isMobile);
+
+  // ✅ 随机按钮：窄屏 80px / 宽屏 120px
+  if (randBtn) {
+    randBtn.style("width", isMobile ? "80px" : "120px");
+  }
+
+  // ===== 检测从窄屏 <-> 宽屏的切换，做一次性清理 =====
+  if (lastIsMobile === null) lastIsMobile = isMobile;
+
+  if (isMobile !== lastIsMobile) {
+    if (!isMobile) {
+      // ✅ 从窄屏回到宽屏：强制关抽屉壳
+      if (drawerShell) drawerShell.hide();
+
+      applyUIBaseX(4);
+
+      // ✅ 把 UI 从抽屉里“拔出来”（防止还在 drawerPanel 里面）
+      uiContainer.parent(document.body);
+
+      // ✅ 清掉窄屏抽屉遗留样式（避免看起来还像抽屉）
+      uiContainer.style("position", "absolute");
+      uiContainer.style("width", UI_BASE_W + "px");
+      uiContainer.style("height", uiContentH + "px");
+      uiContainer.style("background", "transparent");
+      uiContainer.style("border", "none");
+      uiContainer.style("border-radius", "0");
+      uiContainer.style("overflow-y", "visible");
+      uiContainer.style("overflow-x", "visible");
+      uiContainer.style("left", "0px");
+      uiContainer.style("top", "0px");
+    } else {
+      // ✅ 从宽屏进入窄屏：显示抽屉壳（如果你需要它）
+      if (drawerShell) drawerShell.show();
+      // 如果你希望 UI 放进抽屉壳里对齐：
+      // uiContainer.parent(drawerPanel);
+    }
+
+    lastIsMobile = isMobile;
+  }
+
+  // ========== 窄屏：UI 当抽屉固定在底部 ==========
+  if (isMobile) {
+    // 宽屏用的样式别带过来
+    uiContainer.style("transform", "scale(1)");
+    uiContainer.style("position", "fixed"); // 让它真的贴在屏幕底部
+
+    // 抽屉尺寸（像素）
+    const drawerH = Math.floor(height * MOBILE_DRAWER_H_RATIO);
+    const drawerW = Math.floor(width - MOBILE_DRAWER_MARGIN * 2);
+    const centeredBaseX = (drawerW - (UI_BASE_W - 8)) / 2; // (drawerW - BOX_W) / 2
+    applyUIBaseX(centeredBaseX);
+
+    // 打开/关闭：关闭时只露出一点点高度（你可以调这个数）
+    const PEEK_H = 44; // 关闭时露出的高度
+    const y = isDrawerOpen
+      ? height - drawerH - MOBILE_DRAWER_MARGIN
+      : height - PEEK_H;
+
+    // 应用位置 & 外观
+    uiContainer.style("width", drawerW + "px");
+    uiContainer.style("height", drawerH + "px");
+    uiContainer.style("background", "none");
+    uiContainer.style("border", "none");
+    uiContainer.style(
+      "border-radius",
+      `${MOBILE_DRAWER_RADIUS}px ${MOBILE_DRAWER_RADIUS}px 0 0`
+    );
+    uiContainer.style("box-sizing", "border-box");
+    uiContainer.style("overflow-y", "auto");
+    uiContainer.style("overflow-x", "hidden");
+    uiContainer.style("-webkit-overflow-scrolling", "touch");
+    uiContainer.style("z-index", "9998");
+
+    // ✅ 用 fixed 的 left/top（不要用 position()）
+    uiContainer.style("left", MOBILE_DRAWER_MARGIN + "px");
+    uiContainer.style("top", y + "px");
+
+    // 随机按钮仍在右上角
+    if (randBtn) {
+      const m = 16;
+      const w = randBtn.elt.offsetWidth || 140;
+      randBtn.position(Math.round(width - w - m), m);
+    }
+
+    return; // ✅ 窄屏不走宽屏布局
+  }
+
+  // ========== 宽屏：正常右侧面板（禁用抽屉） ==========
+  if (drawerShell) drawerShell.hide();
+
+  // 宽屏用 absolute
+  uiContainer.style("position", "absolute");
+  uiContainer.style("overflow-y", "visible"); // 宽屏不需要内部滚动
+  uiContainer.style("border", "none");
+  uiContainer.style("background", "transparent");
+  uiContainer.style("border-radius", "0");
+  uiContainer.style("z-index", "1");
+
   const margin = 20;
   const avatarRightScreen = offsetX + 420 * scaleFactor;
 
-  let panelX, panelY;
-
-  // ===== UI 自适应缩放 =====
-
-  let availableH, availableW;
-
-  if (width > WIDE_SCREEN_BREAKPOINT) {
-    availableH = height - 40;
-    availableW = width - (avatarRightScreen + margin) - 40;
-  } else {
-    availableH = height - 40;
-    availableW = width - 2 * margin;
-  }
-
-  // ✅ 防止负数导致缩放跳变
+  // 可用空间
+  let availableH = height - 40;
+  let availableW = width - (avatarRightScreen + margin) - 40;
   availableW = max(0, availableW);
   availableH = max(0, availableH);
 
@@ -519,59 +836,34 @@ function layoutUI() {
   let sW = UI_BASE_W > 0 ? availableW / UI_BASE_W : 1;
 
   let uiScale = min(sH, sW);
-
-  // ✅ 用你上面的常量
   uiScale = constrain(uiScale, UI_MIN_SCALE, UI_MAX_SCALE);
   uiScale = Math.round(uiScale * 100) / 100;
-
   uiContainer.style("transform", `scale(${uiScale})`);
 
-  if (width > WIDE_SCREEN_BREAKPOINT) {
-    // 1) UI 放右侧
-    panelX = avatarRightScreen + margin;
+  // 右侧居中
+  let panelX = avatarRightScreen + margin;
 
-    // 2) 算人物中心 Y（和 drawAvatar 同一套定位）
-    const headY = AVATAR_HEAD_TOP_Y;
-    const SEAM_FIX = 8;
+  const headY = AVATAR_HEAD_TOP_Y;
+  const SEAM_FIX = 8;
+  const topY = headY + HEAD_H - SEAM_FIX;
+  const bottomY = topY + BODY_TOP_H - SEAM_FIX;
+  const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
-    const topY = headY + HEAD_H - SEAM_FIX;
-    const bottomY = topY + BODY_TOP_H - SEAM_FIX;
-    const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
+  const avatarTopScreenReal = offsetY + headY * scaleFactor;
+  const avatarBottomScreenReal = offsetY + (shoesY + SHOES_H) * scaleFactor;
+  const avatarCenterY = (avatarTopScreenReal + avatarBottomScreenReal) / 2;
 
-    const avatarTopScreenReal = offsetY + headY * scaleFactor;
-    const avatarBottomScreenReal = offsetY + (shoesY + SHOES_H) * scaleFactor;
-    const avatarCenterY = (avatarTopScreenReal + avatarBottomScreenReal) / 2;
+  const scaledUIH = uiContentH * uiScale;
+  let panelY = avatarCenterY - scaledUIH / 2;
+  panelY = constrain(panelY, 20, height - scaledUIH - 20);
 
-    // 3) 用缩放后的 UI 高度来居中
-    const scaledUIH = uiContentH * uiScale;
-    panelY = avatarCenterY - scaledUIH / 2;
+  uiContainer.position(Math.round(panelX), Math.round(panelY));
 
-    // 4) 防止 UI 掉出屏幕
-    panelY = constrain(panelY, 20, height - scaledUIH - 20);
-  } else {
-    // 窄屏：UI 放人物下面
-    panelX = margin;
-    const avatarBottomScreen =
-      offsetY +
-      (AVATAR_HEAD_TOP_Y + HEAD_H + BODY_TOP_H + BODY_BOTTOM_H + SHOES_H + 40) *
-        scaleFactor;
-    panelY = avatarBottomScreen + margin;
+  if (randBtn) {
+    const m = 16;
+    const w = randBtn.elt.offsetWidth || 140;
+    randBtn.position(Math.round(width - w - m), m);
   }
-
-  // 位置取整，避免子像素抖动
-  panelX = Math.round(panelX);
-  panelY = Math.round(panelY);
-
-  // ===== lerp 平滑 UI 位置（防跳、防硬切）=====
-  targetUiX = panelX;
-  targetUiY = panelY;
-
-  // lerp 平滑跟随
-  uiX = lerp(uiX, targetUiX, 0.15);
-  uiY = lerp(uiY, targetUiY, 0.15);
-
-  // 防止子像素抖动
-  uiContainer.position(Math.round(uiX), Math.round(uiY));
 }
 
 // 画整个人物（头 + 身体）
@@ -680,6 +972,9 @@ function drawCheek(headX, headY) {
 
 // ==== 导出功能（考虑缩放和偏移）====
 function exportAvatar(mode) {
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+  const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
+
   const headX = AVATAR_CENTER_X - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
