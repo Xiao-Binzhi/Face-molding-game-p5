@@ -113,6 +113,7 @@ let bottomImgs = [];
 // let shoesImgs = [];
 
 let rSlider, gSlider, bSlider;
+let rgbSwatch, rgbInput; // ✅ 颜色预览框 + RGB输入框
 
 // 鞋子可调色（RGB）
 let shoeR = 200;
@@ -228,7 +229,7 @@ function setup() {
   pixelDensity(2); // 先写 2，mac/retina 会更细腻
   smooth();
 
-  background(245);
+  background(255);
 
   createUI();
   createDrawer();
@@ -413,20 +414,87 @@ function createUI() {
   createUISectionTitle("鞋子颜色 Shoes Color (RGB)", x, y);
   y += 30;
 
+  // ✅ 记录三条滑条开始的 y，用于把右侧组件对齐到同一高度
+  const sliderStartY = y;
+
+  // R
   rSlider = createSlider(0, 255, shoeR, 1);
-  rSlider.input(() => (shoeR = rSlider.value()));
+  rSlider.input(() => {
+    shoeR = rSlider.value();
+    updateRGBUI();
+  });
   registerUI(rSlider, x, y);
   y += 30;
 
+  // G
   gSlider = createSlider(0, 255, shoeG, 1);
-  gSlider.input(() => (shoeG = gSlider.value()));
+  gSlider.input(() => {
+    shoeG = gSlider.value();
+    updateRGBUI();
+  });
   registerUI(gSlider, x, y);
   y += 30;
 
+  // B
   bSlider = createSlider(0, 255, shoeB, 1);
-  bSlider.input(() => (shoeB = bSlider.value()));
+  bSlider.input(() => {
+    shoeB = bSlider.value();
+    updateRGBUI();
+  });
   registerUI(bSlider, x, y);
   y += 30;
+
+  // ✅ 右侧：颜色预览框（放在三条滑条右边）
+  const RGB_BOX_X = x + 170; // ✅ 改这个：越大越往右
+
+  const SWATCH_W = 36; // ✅ 预览框宽度
+  const SWATCH_H = 36; // ✅ 预览框高度
+
+  const INPUT_W = 100; // ✅ 输入框宽度
+  const INPUT_H = 34; // ✅ 输入框高度
+
+  rgbSwatch = createDiv(""); // 预览框（显示颜色 + 文字）
+  rgbSwatch.style("border", "3px solid #111");
+  rgbSwatch.style("border-radius", "10px");
+  rgbSwatch.style("box-sizing", "border-box");
+  rgbSwatch.style("display", "flex");
+  rgbSwatch.style("align-items", "center");
+  rgbSwatch.style("justify-content", "center");
+  rgbSwatch.style("font-weight", "700");
+  rgbSwatch.style("font-size", "12px");
+  registerUI(rgbSwatch, RGB_BOX_X, sliderStartY);
+  rgbSwatch.size(SWATCH_W, SWATCH_H);
+
+  rgbInput = createInput(""); // 输入框（可输入 255/255/255）
+  rgbInput.attribute("placeholder", "255/255/255");
+  rgbInput.style("width", INPUT_W + "px");
+  rgbInput.style("height", INPUT_H + "px");
+  rgbInput.style("border", "3px solid #111");
+  rgbInput.style("border-radius", "10px");
+  rgbInput.style("box-sizing", "border-box");
+  rgbInput.style("padding", "0 5px");
+  rgbInput.style("font-weight", "600");
+  rgbInput.style("font-size", "13px");
+  rgbInput.style("text-align", "center");
+  registerUI(rgbInput, RGB_BOX_X, sliderStartY + SWATCH_H + 10);
+
+  // ✅ 用户输入 -> 同步鞋子颜色 + 三条滑条
+  rgbInput.changed(() => {
+    const raw = (rgbInput.value() || "").trim();
+    const parts = raw.split(/[\s,\/]+/).filter(Boolean);
+
+    if (parts.length >= 3) {
+      setShoeRGB(parts[0], parts[1], parts[2]);
+    } else {
+      // 格式不对就回滚显示
+      updateRGBUI();
+    }
+  });
+
+  // ✅ 初始化一次显示
+  updateRGBUI();
+
+  y = max(y, sliderStartY + SWATCH_H + 10 + INPUT_H + 12);
 
   endGroupBox(shoesGroup);
 
@@ -470,7 +538,7 @@ function createUI() {
   endGroupBox(exportGroup);
 
   // ======================
-  // 浮动随机按钮（不放进框）
+  // 浮动随机按钮
   // ======================
   randBtn = createButton("随机 Random");
   randBtn.mousePressed(randomizeAvatar);
@@ -591,33 +659,87 @@ function styleRandomButton(btn) {
 }
 
 function styleExportButton(btn, isMobile) {
-  btn.style("height", isMobile ? "32px" : "32px");
-  btn.style("width", isMobile ? "88px" : "84px"); // ✅ 按想要的改
+  btn.style("height", "32px");
+  btn.style("width", isMobile ? "88px" : "84px");
   btn.style("padding", "0");
   btn.style("border", "3px solid #111");
   btn.style("border-radius", "8px");
-  btn.style("background", "#fff");
-  btn.style("color", "#111");
   btn.style("cursor", "pointer");
-  btn.style("font-size", isMobile ? "13px" : "12px");
+  btn.style("font-size", isMobile ? "13px" : "14px");
   btn.style("font-weight", "600");
   btn.style("display", "flex");
   btn.style("align-items", "center");
   btn.style("justify-content", "center");
+  btn.style("transition", "all 140ms ease");
+
+  // ✅ 只绑定一次 hover 事件
+  if (!btn.elt.dataset.hoverBound) {
+    btn.elt.dataset.hoverBound = "1";
+    btn.elt.dataset.isHover = "0";
+
+    btn.mouseOver(() => {
+      btn.elt.dataset.isHover = "1";
+      btn.style("background", "#111");
+      btn.style("color", "#fff");
+    });
+
+    btn.mouseOut(() => {
+      btn.elt.dataset.isHover = "0";
+      btn.style("background", "#fff");
+      btn.style("color", "#111");
+    });
+  }
+
+  // ✅ 每帧根据状态决定最终颜色（避免被重置）
+  const hovering = btn.elt.dataset.isHover === "1";
+  btn.style("background", hovering ? "#111" : "#fff");
+  btn.style("color", hovering ? "#fff" : "#111");
 }
 
 function styleExportSelect(sel, isMobile) {
   sel.style("height", isMobile ? "30px" : "32px");
   sel.style("width", isMobile ? "120px" : "110px"); // ✅ 下拉框宽度
-  sel.style("padding", "0 10px");
+  sel.style("padding", "0 5px");
   sel.style("border", "3px solid #111");
   sel.style("border-radius", "8px");
   sel.style("background", "#fff");
   sel.style("color", "#111");
-  sel.style("font-size", isMobile ? "13px" : "12px");
+  sel.style("font-size", isMobile ? "13px" : "14px");
   sel.style("font-weight", "600");
   sel.style("outline", "none");
   sel.style("box-sizing", "border-box");
+}
+
+function clamp255(v) {
+  v = int(v);
+  return constrain(v, 0, 255);
+}
+
+function setShoeRGB(r, g, b) {
+  shoeR = clamp255(r);
+  shoeG = clamp255(g);
+  shoeB = clamp255(b);
+
+  if (rSlider) rSlider.value(shoeR);
+  if (gSlider) gSlider.value(shoeG);
+  if (bSlider) bSlider.value(shoeB);
+
+  updateRGBUI();
+}
+
+function updateRGBUI() {
+  const txt = `${shoeR}/${shoeG}/${shoeB}`;
+
+  // 输入框：不打断用户正在输入
+  if (rgbInput && document.activeElement !== rgbInput.elt) {
+    rgbInput.value(txt);
+  }
+
+  // 颜色预览框
+  if (rgbSwatch) {
+    rgbSwatch.style("background", `rgb(${shoeR},${shoeG},${shoeB})`);
+    rgbSwatch.html("");
+  }
 }
 
 // 切换某个部件的 index
@@ -668,6 +790,8 @@ function randomizeAvatar() {
   if (rSlider) rSlider.value(shoeR);
   if (gSlider) gSlider.value(shoeG);
   if (bSlider) bSlider.value(shoeB);
+
+  updateRGBUI();
 }
 
 function draw() {
@@ -975,57 +1099,90 @@ function drawCheek(headX, headY) {
 // ==== 导出功能（考虑缩放和偏移）====
 function exportAvatar(mode) {
   const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+
   const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
 
-  const headX = AVATAR_CENTER_X - HEAD_W / 2;
+  // ✅ 建议和 drawAvatar() 统一（画人物用的是 8）
+  const SEAM_FIX = 8;
+
+  // ====== 先把“人物各块在逻辑坐标系里的位置”算出来（必须用 centerX）======
+  const headX = centerX - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
-  const SEAM_FIX = 2;
-
-  const topX = AVATAR_CENTER_X - BODY_TOP_W / 2;
+  const topX = centerX - BODY_TOP_W / 2;
   const topY = headY + HEAD_H - SEAM_FIX;
 
-  const bottomX = AVATAR_CENTER_X - BODY_BOTTOM_W / 2;
+  const bottomX = centerX - BODY_BOTTOM_W / 2;
   const bottomY = topY + BODY_TOP_H - SEAM_FIX;
 
-  const shoesX = AVATAR_CENTER_X - SHOES_W / 2;
+  const shoesX = centerX - SHOES_W / 2;
   const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
+  // ====== 根据导出模式，决定裁切框（逻辑坐标系）======
   let x, y, w, h;
 
   if (mode === "head") {
+    // 头部：头框外多留 10px
     x = headX - 10;
     y = headY - 10;
     w = HEAD_W + 20;
     h = HEAD_H + 20;
   } else if (mode === "half") {
+    // 半身：头 + 上半身（到上衣底部）
     x = min(headX, topX) - 10;
     y = headY - 10;
-    const bottomHalfY = topY + BODY_TOP_H;
-    w = max(headX + HEAD_W, topX + BODY_TOP_W) - x + 10;
-    h = bottomHalfY - y + 20;
-  } else {
+
+    const halfBottomY = topY + BODY_TOP_H; // 上衣底部
+    const rightMost = max(headX + HEAD_W, topX + BODY_TOP_W);
+
+    w = rightMost - x + 10;
+    h = halfBottomY - y + 20;
+  } else if (mode === "full") {
+    // 全身：头 + 上衣 + 下装 + 鞋
     x = min(headX, topX, bottomX, shoesX) - 10;
     y = headY - 10;
-    const bottomFullY = shoesY + SHOES_H;
-    w =
-      max(
-        headX + HEAD_W,
-        topX + BODY_TOP_W,
-        bottomX + BODY_BOTTOM_W,
-        shoesX + SHOES_W
-      ) -
-      x +
-      10;
-    h = bottomFullY - y + 20;
+
+    const fullBottomY = shoesY + SHOES_H; // 鞋底
+    const rightMost = max(
+      headX + HEAD_W,
+      topX + BODY_TOP_W,
+      bottomX + BODY_BOTTOM_W,
+      shoesX + SHOES_W
+    );
+
+    w = rightMost - x + 10;
+    h = fullBottomY - y + 20;
+  } else {
+    // 容错：未知 mode 默认导出全身
+    x = min(headX, topX, bottomX, shoesX) - 10;
+    y = headY - 10;
+
+    const fullBottomY = shoesY + SHOES_H;
+    const rightMost = max(
+      headX + HEAD_W,
+      topX + BODY_TOP_W,
+      bottomX + BODY_BOTTOM_W,
+      shoesX + SHOES_W
+    );
+
+    w = rightMost - x + 10;
+    h = fullBottomY - y + 20;
+    mode = "full";
   }
 
-  // 把逻辑坐标转换成屏幕坐标（考虑缩放和偏移）
-  const sx = offsetX + x * scaleFactor;
-  const sy = offsetY + y * scaleFactor;
-  const sw = w * scaleFactor;
-  const sh = h * scaleFactor;
+  // ====== 把逻辑坐标 -> 屏幕坐标（考虑 offsetX / offsetY / scaleFactor）======
+  let sx = Math.round(offsetX + x * scaleFactor);
+  let sy = Math.round(offsetY + y * scaleFactor);
+  let sw = Math.round(w * scaleFactor);
+  let sh = Math.round(h * scaleFactor);
 
+  // ✅ 防止超出画布导致截取空白/异常
+  sx = constrain(sx, 0, width - 1);
+  sy = constrain(sy, 0, height - 1);
+  sw = constrain(sw, 1, width - sx);
+  sh = constrain(sh, 1, height - sy);
+
+  // ====== 截图并保存 ======
   const img = get(sx, sy, sw, sh);
   const filename = "avatar_" + mode;
   save(img, filename, exportFormat);
