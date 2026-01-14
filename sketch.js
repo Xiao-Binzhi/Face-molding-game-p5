@@ -60,8 +60,8 @@ const MOUTH_COUNT = 12;
 const CHEEK_COUNT = 10;
 const TOP_COUNT = 7;
 const BOTTOM_COUNT = 2;
-const SHOES_COUNT = 4;
-const SHOES_COLOR_COUNT = 2;
+const SHOES_COUNT = 5;
+const SHOES_COLOR_COUNT = 3;
 
 // ==== 逻辑画布尺寸 & 人物位置（不随屏幕变）====
 const BASE_W_DESKTOP = 1100;
@@ -1015,6 +1015,17 @@ function drawAvatar() {
   const shoesX = centerX - SHOES_W / 2;
   const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
+  //  头部/衣服背景色块（放在所有素材之前）
+  noStroke();
+
+  // 头部底色
+  fill("#f5d2c2ff"); // 👈 这里改头部背景色
+  rect(headX, headY, HEAD_W, HEAD_H, HEAD_RADIUS);
+
+  // （可选）下装底色
+  // fill(245);
+  // rect(bottomX, bottomY, BODY_BOTTOM_W, BODY_BOTTOM_H, 14);
+
   // ===== 身体（只画素材，不画区块线框）=====
   const topImg = topImgs[currentTop];
   if (topImg) image(topImg, topX, topY, BODY_TOP_W, BODY_TOP_H);
@@ -1027,8 +1038,13 @@ function drawAvatar() {
   const lineImg = shoesLineImgs[currentShoes];
 
   // shoes1-2 -> colors1, shoes3-4 -> colors2
-  const colorIndex = currentShoes < 2 ? 0 : 1;
-  const fillImg = shoesColorImgs[colorIndex];
+  let colorIndex;
+  if (currentShoes <= 1) colorIndex = 0; // shoes1-2 -> colors1
+  else if (currentShoes <= 3) colorIndex = 1; // shoes3-4 -> colors2
+  else colorIndex = 2; // shoes5 -> colors3
+
+  const fillImg =
+    shoesColorImgs[constrain(colorIndex, 0, SHOES_COLOR_COUNT - 1)];
 
   // 先画可上色的 fill（底层）
   if (fillImg) {
@@ -1061,51 +1077,80 @@ function drawAvatar() {
   if (eyesImg) image(eyesImg, headX, headY, HEAD_W, HEAD_H);
 }
 
-// 头发
-function drawHair(headX, headY) {
-  const img = hairImgs[currentHair];
-  if (img) {
-    image(img, headX, headY, HEAD_W, HEAD_H);
-  }
-}
+// ✅ 给导出用：把人物画到某个 graphics 上（pg）
+function drawAvatarTo(g, centerX) {
+  const headX = centerX - HEAD_W / 2;
+  const headY = AVATAR_HEAD_TOP_Y;
 
-// 眼睛
-function drawEyes(headX, headY) {
-  const img = eyesImgs[currentEyes];
-  if (img) {
-    image(img, headX, headY, HEAD_W, HEAD_H);
-    return;
-  }
-}
+  const SEAM_FIX = 8;
 
-// 嘴巴
-function drawMouth(headX, headY) {
-  const img = mouthImgs[currentMouth];
-  if (img) {
-    image(img, headX, headY, HEAD_W, HEAD_H);
-    return;
-  }
-}
+  const topX = centerX - BODY_TOP_W / 2;
+  const topY = headY + HEAD_H - SEAM_FIX;
 
-// 脸颊
-function drawCheek(headX, headY) {
-  const img = cheekImgs[currentCheek];
-  if (img) {
-    // 和头发/眼睛/嘴一样，整张铺在 288x288 的头框上
-    image(img, headX, headY, HEAD_W, HEAD_H);
+  const bottomX = centerX - BODY_BOTTOM_W / 2;
+  const bottomY = topY + BODY_TOP_H - SEAM_FIX;
+
+  const shoesX = centerX - SHOES_W / 2;
+  const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
+
+  // ✅ 先画底色（导出需要，顺序必须在所有贴图之前）
+  g.noStroke();
+  g.fill("#f5d2c2ff"); // 跟 drawAvatar 里的颜色一致
+  g.rect(headX, headY, HEAD_W, HEAD_H, 60);
+
+  // 上衣
+  const topImg = topImgs[currentTop];
+  if (topImg) g.image(topImg, topX, topY, BODY_TOP_W, BODY_TOP_H);
+
+  // 下装
+  const bottomImg = bottomImgs[currentBottom];
+  if (bottomImg)
+    g.image(bottomImg, bottomX, bottomY, BODY_BOTTOM_W, BODY_BOTTOM_H);
+
+  // 鞋：颜色层 + 线稿层
+  const lineImg = shoesLineImgs[currentShoes];
+  let colorIndex;
+  if (currentShoes <= 1) colorIndex = 0; // shoes1-2 -> colors1
+  else if (currentShoes <= 3) colorIndex = 1; // shoes3-4 -> colors2
+  else colorIndex = 2; // shoes5 -> colors3
+
+  const fillImg =
+    shoesColorImgs[constrain(colorIndex, 0, SHOES_COLOR_COUNT - 1)];
+
+  if (fillImg) {
+    g.push();
+    g.tint(shoeR, shoeG, shoeB);
+    g.image(fillImg, shoesX, shoesY, SHOES_W, SHOES_H);
+    g.pop();
   }
+  if (lineImg) g.image(lineImg, shoesX, shoesY, SHOES_W, SHOES_H);
+
+  // 嘴
+  const mouthImg = mouthImgs[currentMouth];
+  if (mouthImg) g.image(mouthImg, headX, headY, HEAD_W, HEAD_H);
+
+  // 头发
+  const hairImg = hairImgs[currentHair];
+  if (hairImg) g.image(hairImg, headX, headY, HEAD_W, HEAD_H);
+
+  // 脸颊
+  const cheekImg = cheekImgs[currentCheek];
+  if (cheekImg) g.image(cheekImg, headX, headY, HEAD_W, HEAD_H);
+
+  // 眼睛
+  const eyesImg = eyesImgs[currentEyes];
+  if (eyesImg) g.image(eyesImg, headX, headY, HEAD_W, HEAD_H);
 }
 
 // ==== 导出功能（考虑缩放和偏移）====
 function exportAvatar(mode) {
   const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
-
   const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
 
-  // ✅ 建议和 drawAvatar() 统一（画人物用的是 8）
   const SEAM_FIX = 8;
+  const PAD = 0; // ✅ 导出边距
 
-  // ====== 先把“人物各块在逻辑坐标系里的位置”算出来（必须用 centerX）======
+  // ===== 逻辑坐标下的位置 =====
   const headX = centerX - HEAD_W / 2;
   const headY = AVATAR_HEAD_TOP_Y;
 
@@ -1118,74 +1163,68 @@ function exportAvatar(mode) {
   const shoesX = centerX - SHOES_W / 2;
   const shoesY = bottomY + BODY_BOTTOM_H - SEAM_FIX;
 
-  // ====== 根据导出模式，决定裁切框（逻辑坐标系）======
+  // ===== 裁切框（逻辑坐标）=====
   let x, y, w, h;
 
   if (mode === "head") {
-    // 头部：头框外多留 10px
-    x = headX - 10;
-    y = headY - 10;
-    w = HEAD_W + 20;
-    h = HEAD_H + 20;
+    const left = headX;
+    const top = headY;
+    const right = headX + HEAD_W;
+    const bottom = headY + HEAD_H;
+
+    x = left - PAD;
+    y = top - PAD;
+    w = right - left + PAD * 2;
+    h = bottom - top + PAD * 2;
   } else if (mode === "half") {
-    // 半身：头 + 上半身（到上衣底部）
-    x = min(headX, topX) - 10;
-    y = headY - 10;
+    const left = Math.min(headX, topX);
+    const top = headY;
+    const right = Math.max(headX + HEAD_W, topX + BODY_TOP_W);
+    const bottom = bottomY;
 
-    const halfBottomY = topY + BODY_TOP_H; // 上衣底部
-    const rightMost = max(headX + HEAD_W, topX + BODY_TOP_W);
-
-    w = rightMost - x + 10;
-    h = halfBottomY - y + 20;
-  } else if (mode === "full") {
-    // 全身：头 + 上衣 + 下装 + 鞋
-    x = min(headX, topX, bottomX, shoesX) - 10;
-    y = headY - 10;
-
-    const fullBottomY = shoesY + SHOES_H; // 鞋底
-    const rightMost = max(
-      headX + HEAD_W,
-      topX + BODY_TOP_W,
-      bottomX + BODY_BOTTOM_W,
-      shoesX + SHOES_W
-    );
-
-    w = rightMost - x + 10;
-    h = fullBottomY - y + 20;
+    x = left - PAD;
+    y = top - PAD;
+    w = right - left + PAD * 2;
+    h = bottom - top + PAD * 2;
   } else {
-    // 容错：未知 mode 默认导出全身
-    x = min(headX, topX, bottomX, shoesX) - 10;
-    y = headY - 10;
-
-    const fullBottomY = shoesY + SHOES_H;
-    const rightMost = max(
+    mode = "full";
+    const left = Math.min(headX, topX, bottomX, shoesX);
+    const top = headY;
+    const right = Math.max(
       headX + HEAD_W,
       topX + BODY_TOP_W,
       bottomX + BODY_BOTTOM_W,
       shoesX + SHOES_W
     );
+    const bottom = shoesY + SHOES_H;
 
-    w = rightMost - x + 10;
-    h = fullBottomY - y + 20;
-    mode = "full";
+    x = left - PAD;
+    y = top - PAD;
+    w = right - left + PAD * 2;
+    h = bottom - top + PAD * 2;
   }
 
-  // ====== 把逻辑坐标 -> 屏幕坐标（考虑 offsetX / offsetY / scaleFactor）======
-  let sx = Math.round(offsetX + x * scaleFactor);
-  let sy = Math.round(offsetY + y * scaleFactor);
-  let sw = Math.round(w * scaleFactor);
-  let sh = Math.round(h * scaleFactor);
+  // ✅ 导出分辨率倍率：1=正常；2=更清晰；3=更大
+  const EXPORT_SCALE = 3;
 
-  // ✅ 防止超出画布导致截取空白/异常
-  sx = constrain(sx, 0, width - 1);
-  sy = constrain(sy, 0, height - 1);
-  sw = constrain(sw, 1, width - sx);
-  sh = constrain(sh, 1, height - sy);
+  const outW = Math.round(w * EXPORT_SCALE);
+  const outH = Math.round(h * EXPORT_SCALE);
 
-  // ====== 截图并保存 ======
-  const img = get(sx, sy, sw, sh);
-  const filename = "avatar_" + mode;
-  save(img, filename, exportFormat);
+  const pg = createGraphics(outW, outH);
+  pg.pixelDensity(1);
+
+  // ✅ 关键：PNG 用 clear() 才是透明；JPG 必须有背景色
+  if (exportFormat === "png") pg.clear();
+  else pg.background(255);
+
+  pg.push();
+  pg.scale(EXPORT_SCALE);
+  pg.translate(-x, -y); // 把人物移动进裁切框
+  drawAvatarTo(pg, centerX); // ✅ 只画人物到 pg
+  pg.pop();
+
+  const outImg = pg.get(); // 转成 p5.Image 更稳
+  save(outImg, "avatar_" + mode, exportFormat);
 }
 
 // 窗口尺寸变化时，让画布跟着变
