@@ -55,13 +55,15 @@ function registerUI(el, relX, relY) {
 
 // ==== 配置：每个部件有多少张图 ====
 const HAIR_COUNT = 17;
-const EYES_COUNT = 30;
+const EYES_COUNT = 31;
 const MOUTH_COUNT = 12;
 const CHEEK_COUNT = 10;
 const TOP_COUNT = 7;
 const BOTTOM_COUNT = 2;
 const SHOES_COUNT = 5;
 const SHOES_COLOR_COUNT = 3;
+
+const OUTLINE_PX = 6; // 白边粗细（逻辑像素）
 
 // ==== 逻辑画布尺寸 & 人物位置（不随屏幕变）====
 const BASE_W_DESKTOP = 1100;
@@ -511,6 +513,7 @@ function createUI() {
   exportFormatSelect = createSelect();
   exportFormatSelect.option("png");
   exportFormatSelect.option("jpg");
+  exportFormatSelect.option("png_outline");
   exportFormatSelect.selected("png");
   exportFormatSelect.changed(() => {
     exportFormat = exportFormatSelect.value();
@@ -1148,7 +1151,8 @@ function exportAvatar(mode) {
   const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
 
   const SEAM_FIX = 8;
-  const PAD = 0; // ✅ 导出边距
+  const isOutline = exportFormat === "png_outline";
+  const PAD = isOutline ? OUTLINE_PX : 0; // ✅ 仅白边模式留边距=白边宽度
 
   // ===== 逻辑坐标下的位置 =====
   const headX = centerX - HEAD_W / 2;
@@ -1180,7 +1184,7 @@ function exportAvatar(mode) {
     const left = Math.min(headX, topX);
     const top = headY;
     const right = Math.max(headX + HEAD_W, topX + BODY_TOP_W);
-    const bottom = bottomY;
+    const bottom = bottomY; // 你之前为避免露出裤子这样写是对的
 
     x = left - PAD;
     y = top - PAD;
@@ -1204,7 +1208,6 @@ function exportAvatar(mode) {
     h = bottom - top + PAD * 2;
   }
 
-  // ✅ 导出分辨率倍率：1=正常；2=更清晰；3=更大
   const EXPORT_SCALE = 3;
 
   const outW = Math.round(w * EXPORT_SCALE);
@@ -1213,22 +1216,96 @@ function exportAvatar(mode) {
   const pg = createGraphics(outW, outH);
   pg.pixelDensity(1);
 
-  // ✅ 关键：PNG 用 clear() 才是透明；JPG 必须有背景色
-  if (exportFormat === "png") pg.clear();
+  // 背景：png / png_outline 透明；jpg 白底
+  if (exportFormat === "png" || isOutline) pg.clear();
   else pg.background(255);
 
   pg.push();
   pg.scale(EXPORT_SCALE);
-  pg.translate(-x, -y); // 把人物移动进裁切框
-  drawAvatarTo(pg, centerX); // ✅ 只画人物到 pg
+  pg.translate(-x, -y);
+  drawAvatarTo(pg, centerX);
   pg.pop();
 
-  const outImg = pg.get(); // 转成 p5.Image 更稳
-  save(outImg, "avatar_" + mode, exportFormat);
+  let outImg;
+  if (isOutline) {
+    outImg = addWhiteOutline(pg, Math.round(OUTLINE_PX * EXPORT_SCALE));
+    save(outImg, "avatar_" + mode, "png"); // 强制 png
+  } else {
+    outImg = pg.get();
+    save(outImg, "avatar_" + mode, exportFormat);
+  }
 }
 
 // 窗口尺寸变化时，让画布跟着变
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   layoutUI();
+}
+
+function addWhiteOutline(srcPg, radiusPx) {
+  // radiusPx: 像素级描边半径（已经乘了 EXPORT_SCALE）
+  const w = srcPg.width;
+  const h = srcPg.height;
+
+  // 读原图像素
+  srcPg.loadPixels();
+  const sp = srcPg.pixels;
+
+  // 新建描边层
+  const outlinePg = createGraphics(w, h);
+  outlinePg.pixelDensity(1);
+  outlinePg.clear();
+  outlinePg.loadPixels();
+  const op = outlinePg.pixels;
+
+  // 提前算一个圆形邻域（比 r^2 全扫快很多）
+  const offsets = [];
+  const r2 = radiusPx * radiusPx;
+  for (let dy = -radiusPx; dy <= radiusPx; dy++) {
+    for (let dx = -radiusPx; dx <= radiusPx; dx++) {
+      if (dx * dx + dy * dy <= r2) offsets.push([dx, dy]);
+    }
+  }
+
+  // 对每个透明像素：如果它附近存在非透明像素 -> 画成白色（描边）
+  // （只做外描边，不覆盖人物内部）
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = 4 * (y * w + x);
+      const a = sp[idx + 3];
+      if (a !== 0) continue; // 只处理透明处（外轮廓）
+
+      let near = false;
+      for (let k = 0; k < offsets.length; k++) {
+        const dx = offsets[k][0];
+        const dy = offsets[k][1];
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+        const nidx = 4 * (ny * w + nx);
+        if (sp[nidx + 3] !== 0) {
+          near = true;
+          break;
+        }
+      }
+
+      if (near) {
+        op[idx] = 255; // R
+        op[idx + 1] = 255; // G
+        op[idx + 2] = 255; // B
+        op[idx + 3] = 255; // A
+      }
+    }
+  }
+
+  outlinePg.updatePixels();
+
+  // 合成：描边在下面，人物在上面
+  const merged = createGraphics(w, h);
+  merged.pixelDensity(1);
+  merged.clear();
+  merged.image(outlinePg, 0, 0);
+  merged.image(srcPg, 0, 0);
+
+  return merged.get();
 }
