@@ -12,6 +12,9 @@ const DEBUG_LOADING = false;
 let uiContainer; // UI 的容器
 let uiContentH = 0; // UI 实际高度（自动测量）
 
+let mobileAvatarAreaHPx = null; // 窄屏预览区域的“当前高度”（用于动画）
+const MOBILE_AVATAR_LERP = 0.12; // 动画速度：0.08~0.2 都行
+
 const UI_BASE_W = 320; // ✅ 放到最前
 
 let UI_PANEL_W = UI_BASE_W;
@@ -253,6 +256,21 @@ function preload() {
 function setup() {
   // 画布大小 = 当前窗口大小（自适应）
   createCanvas(windowWidth, windowHeight);
+  cnv = createCanvas(windowWidth, windowHeight);
+  cnv.elt.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.cancelable) e.preventDefault();
+    },
+    { passive: false },
+  );
+  cnv.elt.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.cancelable) e.preventDefault();
+    },
+    { passive: false },
+  );
 
   pixelDensity(2); // 先写 2，mac/retina 会更细腻
   smooth();
@@ -979,8 +997,16 @@ function draw() {
     offsetX = Math.round((width - drawW) / 2);
     offsetY = Math.round((height - drawH) / 2);
   } else {
-    // ===== 窄屏：人物只用“上半区域” fit，避免被抽屉挡住 =====
-    const avatarAreaH = height * MOBILE_AVATAR_AREA_RATIO;
+    // 窄屏：预览高度跟抽屉开合联动，并做平滑过渡（点击把手就会“放大/缩小”）
+    const targetAvatarAreaH = getTargetMobileAvatarAreaH();
+    if (mobileAvatarAreaHPx == null) mobileAvatarAreaHPx = targetAvatarAreaH;
+    mobileAvatarAreaHPx = lerp(
+      mobileAvatarAreaHPx,
+      targetAvatarAreaH,
+      MOBILE_AVATAR_LERP,
+    );
+
+    const avatarAreaH = mobileAvatarAreaHPx;
 
     fitScale = min(width / baseW, avatarAreaH / baseH);
     scaleFactor = fitScale;
@@ -1033,6 +1059,16 @@ function applyMobileDrawerLayout(drawerW, drawerH) {
     "z-index": UI_Z_MOBILE,
     padding: "0px",
   });
+}
+
+function getTargetMobileAvatarAreaH() {
+  const drawerH = Math.floor(height * MOBILE_DRAWER_H_RATIO);
+  const drawerTopY = isDrawerOpen
+    ? height - drawerH - MOBILE_DRAWER_MARGIN
+    : height - MOBILE_PEEK_H;
+
+  // 留一点缝，避免刚好顶住抽屉
+  return Math.max(120, drawerTopY + 60);
 }
 
 function applyDesktopPanelLayout(panelX, panelY, uiScale) {
@@ -1542,11 +1578,11 @@ function screenToWorld(mx, my) {
   };
 }
 
-function mousePressed() {
-  const m = screenToWorld(mouseX, mouseY);
+function startDragAt(sx, sy) {
+  const m = screenToWorld(sx, sy);
   const r = getCardRect();
 
-  // 只要点在卡片范围内，就允许“抓住图片移动”
+  // 只在卡片范围内允许拖拽
   if (m.x < r.x || m.x > r.x + r.cardW || m.y < r.y || m.y > r.y + r.cardH)
     return;
 
@@ -1555,14 +1591,106 @@ function mousePressed() {
   dragDY = m.y - userImgY;
 }
 
-function mouseDragged() {
+function dragTo(sx, sy) {
   if (!isDraggingUserImg) return;
-
-  const m = screenToWorld(mouseX, mouseY);
+  const m = screenToWorld(sx, sy);
   userImgX = m.x - dragDX;
   userImgY = m.y - dragDY;
 }
 
-function mouseReleased() {
+function endDrag() {
   isDraggingUserImg = false;
+}
+
+function startUserImgDrag(screenX, screenY, limitToWin) {
+  const m = screenToWorld(screenX, screenY);
+  const r = getCardRect();
+
+  const inArea = limitToWin
+    ? m.x >= r.winX &&
+      m.x <= r.winX + r.winW &&
+      m.y >= r.winY &&
+      m.y <= r.winY + r.winH
+    : m.x >= r.x && m.x <= r.x + r.cardW && m.y >= r.y && m.y <= r.y + r.cardH;
+
+  if (!inArea) return false;
+
+  isDraggingUserImg = true;
+  dragDX = m.x - userImgX;
+  dragDY = m.y - userImgY;
+  return true;
+}
+
+function moveUserImgDrag(screenX, screenY, limitToWin) {
+  if (!isDraggingUserImg) return;
+
+  const m = screenToWorld(screenX, screenY);
+  const r = getCardRect();
+
+  let nx = m.x - dragDX;
+  let ny = m.y - dragDY;
+
+  // ✅ 窄屏触屏：强制把中心点限制在透明窗口内，避免拖到外面找不回来
+  if (limitToWin) {
+    nx = constrain(nx, r.winX, r.winX + r.winW);
+    ny = constrain(ny, r.winY, r.winY + r.winH);
+  }
+
+  userImgX = nx;
+  userImgY = ny;
+}
+
+function mousePressed() {
+  // ✅ 窄屏不走 mouse（触屏用 touch* 处理）
+  if (width <= WIDE_SCREEN_BREAKPOINT) return;
+
+  startUserImgDrag(mouseX, mouseY, false); // 桌面：卡片范围内可拖
+}
+
+function mouseDragged() {
+  if (width <= WIDE_SCREEN_BREAKPOINT) return;
+
+  moveUserImgDrag(mouseX, mouseY, false);
+}
+
+function mouseReleased() {
+  if (width <= WIDE_SCREEN_BREAKPOINT) return;
+
+  isDraggingUserImg = false;
+}
+
+function touchStarted() {
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+  if (!isMobile) return true;
+
+  if (!touches || touches.length === 0) return true;
+  const t = touches[0];
+
+  // ✅ 只在透明窗口内允许开始拖拽
+  const started = startUserImgDrag(t.x, t.y, true);
+
+  // started=true => 阻止默认（避免滚动），开始拖拽
+  // started=false => 不拦截，让区域外保持正常点击/滚动
+  return started ? false : true;
+}
+
+function touchMoved() {
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+  if (!isMobile) return true;
+
+  if (!isDraggingUserImg) return true;
+  const t = touches[0];
+
+  moveUserImgDrag(t.x, t.y, true);
+
+  // ✅ 拖拽过程中阻止页面/抽屉滚动
+  return false;
+}
+
+function touchEnded() {
+  const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
+  if (!isMobile) return true;
+
+  isDraggingUserImg = false;
+  return true;
 }
