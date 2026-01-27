@@ -4,6 +4,12 @@ let cardTemplateImg = null; // 透卡模板永远在最上层
 
 let fileInputAvatar, uploadAvatarBtn, deleteAvatarBtn;
 
+let introOverlay = null;
+let introCard = null;
+let introBtn = null;
+
+let showIntro = true; // 需要每次都弹就 true；只弹一次可以配 localStorage（见下方）
+
 let uploadedAvatarImg = null;
 let drawerHandle = null;
 
@@ -253,6 +259,124 @@ function preload() {
   );
 }
 
+function showIntroOverlay() {
+  // 如果已存在，先删掉
+  if (introOverlay) introOverlay.remove();
+
+  // ===== 全屏半透明遮罩 =====
+  introOverlay = createDiv();
+  introOverlay.position(0, 0);
+  introOverlay.style("position", "fixed");
+  introOverlay.style("left", "0");
+  introOverlay.style("top", "0");
+  introOverlay.style("width", "100vw");
+  introOverlay.style("height", "100vh");
+  introOverlay.style("background", "rgba(0,0,0,0.55)"); // 半透明黑
+  introOverlay.style("z-index", "20000"); // 比你的 UI 高就行
+  introOverlay.style("display", "flex");
+  introOverlay.style("justify-content", "center");
+
+  const isMobileNow = windowWidth <= WIDE_SCREEN_BREAKPOINT;
+  introOverlay.style("align-items", isMobileNow ? "flex-start" : "center");
+
+  introOverlay.style("pointer-events", "auto");
+
+  // 点击遮罩不关闭（避免误触），需要的话可加：introOverlay.mousePressed(()=>{});
+  // introOverlay.style("backdrop-filter", "blur(2px)"); // 想更高级可开（部分浏览器支持）
+
+  // ===== 中央卡片 =====
+  introCard = createDiv();
+  introCard.parent(introOverlay);
+  introCard.style("width", "min(520px, 86vw)");
+  introCard.style("border", "2px solid rgba(255,255,255,0.85)");
+  introCard.style("border-radius", "22px");
+  introCard.style("background", "rgba(20,20,20,0.55)");
+  introCard.style("padding", "22px 22px 18px 22px");
+  introCard.style("box-sizing", "border-box");
+  introCard.style("color", "#fff");
+  introCard.style(
+    "font-family",
+    "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+  );
+  const isMobileNow2 = windowWidth <= WIDE_SCREEN_BREAKPOINT;
+  introCard.style(
+    "margin-top",
+    isMobileNow2 ? "max(24px, env(safe-area-inset-top))" : "0px",
+  );
+  //  窄屏靠上；数值越大越往下
+
+  // 标题
+  const title = createDiv("Ciao! 👋");
+  title.parent(introCard);
+  title.style("font-size", "34px");
+  title.style("font-weight", "800");
+  title.style("letter-spacing", "0.5px");
+  title.style("margin", "0 0 8px 0");
+
+  // 副标题
+  const sub = createDiv("Guida rapida");
+  sub.parent(introCard);
+  sub.style("font-size", "16px");
+  sub.style("opacity", "0.9");
+  sub.style("margin", "0 0 16px 0");
+
+  // 黄色提示框
+  const note = createDiv();
+  note.parent(introCard);
+  note.style("border", "2px solid rgba(255,210,70,0.9)");
+  note.style("border-radius", "16px");
+  note.style("background", "rgba(255,210,70,0.12)");
+  note.style("padding", "12px 14px 10px 14px");
+  note.style("margin", "0 0 16px 0");
+  note.style("line-height", "1.5");
+
+  // 这里放你的“更短引导页”说明（意大利语）
+  const guideHTML = `
+<div style="font-size:14px; opacity:0.95; line-height:1.55;">
+  <b>快速上手 / Guida rapida</b><br/><br/>
+
+  <b>1) 捏脸搭配 / Personalizza</b><br/>
+  ◀/▶ 切换外观；Random 一键随机<br/>
+  Usa ◀/▶ per cambiare l’aspetto; Random per un look casuale.<br/><br/>
+
+  <b>2) 上传角色图 / Carica immagine</b><br/>
+  Upload 导入 → 拖动摆放；Delete 恢复<br/>
+  Upload per importare → trascina; Delete per ripristinare.<br/><br/>
+
+  <b>3) 调整位置 / Regola</b><br/>
+  可直接拖拽,也可用Scale和Rotate滑条调整大小和角度<br/>
+  Scale per la dimensione, Rotate (0–360°), oppure trascina.<br/><br/>
+
+  <b>4) 导出 / Esporta</b><br/>
+  格式：png / jpg / png_outline(白色描边)<br/>
+  Formato: png / jpg / png_outline (contorno bianco)<br/>
+</div>`;
+  const guide = createDiv(guideHTML);
+  guide.parent(note);
+
+  // ===== 底部按钮 =====
+  introBtn = createButton("Inizia!");
+  introBtn.parent(introCard);
+  introBtn.style("width", "100%");
+  introBtn.style("height", "44px");
+  introBtn.style("border", "2px solid rgba(255,255,255,0.85)");
+  introBtn.style("border-radius", "12px");
+  introBtn.style("background", "rgba(255,255,255,0.9)");
+  introBtn.style("color", "#111");
+  introBtn.style("font-weight", "700");
+  introBtn.style("font-size", "16px");
+  introBtn.style("cursor", "pointer");
+  introBtn.style("margin-top", "6px");
+
+  introBtn.mousePressed(() => {
+    if (introOverlay) introOverlay.remove();
+    introOverlay = null;
+
+    // 如果“只弹一次”，取消下面注释：
+    // localStorage.setItem("SHEI_GEN_INTRO_SEEN", "1");
+  });
+}
+
 function setup() {
   // 画布大小 = 当前窗口大小（自适应）
   createCanvas(windowWidth, windowHeight);
@@ -280,6 +404,7 @@ function setup() {
   createUI();
   randomizeAvatar();
   initPlacementForLiveAvatar();
+  if (showIntro) showIntroOverlay();
 }
 
 function createGroupBox(relX, relY, w, h) {
@@ -1509,6 +1634,10 @@ function exportCardPNG() {
 // 窗口尺寸变化时，让画布跟着变
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  if (introOverlay) {
+    // 兜底：确保还在最上层
+    introOverlay.style("z-index", "20000");
+  }
   layoutUI();
 }
 
