@@ -301,7 +301,7 @@ function showIntroOverlay() {
   const isMobileNow2 = windowWidth <= WIDE_SCREEN_BREAKPOINT;
   introCard.style(
     "margin-top",
-    isMobileNow2 ? "max(24px, env(safe-area-inset-top))" : "0px",
+    isMobileNow2 ? "max(12px, env(safe-area-inset-top))" : "0px",
   );
   //  窄屏靠上；数值越大越往下
 
@@ -312,13 +312,6 @@ function showIntroOverlay() {
   title.style("font-weight", "800");
   title.style("letter-spacing", "0.5px");
   title.style("margin", "0 0 8px 0");
-
-  // 副标题
-  const sub = createDiv("Guida rapida");
-  sub.parent(introCard);
-  sub.style("font-size", "16px");
-  sub.style("opacity", "0.9");
-  sub.style("margin", "0 0 16px 0");
 
   // 黄色提示框
   const note = createDiv();
@@ -333,7 +326,7 @@ function showIntroOverlay() {
   // 这里放你的“更短引导页”说明（意大利语）
   const guideHTML = `
 <div style="font-size:14px; opacity:0.95; line-height:1.55;">
-  <b>快速上手 / Guida rapida</b><br/><br/>
+  <b>游戏说明 / Guida rapida</b><br/><br/>
 
   <b>1) 捏脸搭配 / Personalizza</b><br/>
   ◀/▶ 切换外观；Random 一键随机<br/>
@@ -350,6 +343,11 @@ function showIntroOverlay() {
   <b>4) 导出 / Esporta</b><br/>
   格式：png / jpg / png_outline(白色描边)<br/>
   Formato: png / jpg / png_outline (contorno bianco)<br/>
+
+  <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.25); opacity:0.9;">
+    <b>移动端提示：</b>在手机端，点击顶部短横线可展开/收起面板。<br/>
+    <b>Su mobile:</b>  tocca la barretta in alto per aprire/chiudere il pannello.
+  </div>
 </div>`;
   const guide = createDiv(guideHTML);
   guide.parent(note);
