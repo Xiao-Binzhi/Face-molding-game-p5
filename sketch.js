@@ -8,7 +8,7 @@ let introOverlay = null;
 let introCard = null;
 let introBtn = null;
 
-let showIntro = true; // 需要每次都弹就 true；只弹一次可以配 localStorage
+let showIntro = true;
 
 let uploadedAvatarImg = null;
 let drawerHandle = null;
@@ -21,7 +21,7 @@ let uiContentH = 0; // UI 实际高度（自动测量）
 let mobileAvatarAreaHPx = null; // 窄屏预览区域的“当前高度”（用于动画）
 const MOBILE_AVATAR_LERP = 0.12; // 动画速度：0.08~0.2 都行
 
-const UI_BASE_W = 320; // ✅ 放到最前
+const UI_BASE_W = 320; // 放到最前
 
 let UI_PANEL_W = UI_BASE_W;
 let UI_RIGHT_COL_X = 0;
@@ -35,7 +35,7 @@ const DESKTOP_MARGIN = 20; // layoutUI 宽屏 margin
 const RIGHT_COL_SHIFT = 0; //导出部分UI 的右移位置
 
 const UI_SHIFT_X = 80; // UI整体右移量（px）
-const SEAM_FIX = 8; // ✅ 拼接缝修正
+const SEAM_FIX = 8; // 拼接缝修正
 
 const USER_IMG_SCALE_MIN = 0.05; //缩放滑条的最小值
 const USER_IMG_SCALE_MAX = 1.8; // 缩放滑条的最大值
@@ -67,7 +67,7 @@ let dragDX = 0,
 function setUserImgScale(v) {
   userImgScale = constrain(v, USER_IMG_SCALE_MIN, USER_IMG_SCALE_MAX);
 
-  // ✅ 自动同步滑条显示（避免程序改了值但滑条不动）
+  // 自动同步滑条显示（避免程序改了值但滑条不动）
   if (scaleSlider && scaleSlider.value() !== userImgScale) {
     scaleSlider.value(userImgScale);
   }
@@ -185,7 +185,7 @@ let bottomImgs = [];
 // let shoesImgs = [];
 
 let rSlider, gSlider, bSlider;
-let rgbSwatch, rgbInput; // ✅ 颜色预览框 + RGB输入框
+let rgbSwatch, rgbInput; // 颜色预览框 + RGB输入框
 
 // 鞋子可调色（RGB）
 let shoeR = 200;
@@ -280,9 +280,6 @@ function showIntroOverlay() {
   introOverlay.style("align-items", isMobileNow ? "flex-start" : "center");
 
   introOverlay.style("pointer-events", "auto");
-
-  // 点击遮罩不关闭（避免误触），需要的话可加：introOverlay.mousePressed(()=>{});
-  // introOverlay.style("backdrop-filter", "blur(2px)"); // 想更高级可开（部分浏览器支持）
 
   // ===== 中央卡片 =====
   introCard = createDiv();
@@ -413,13 +410,13 @@ function createGroupBox(relX, relY, w, h) {
   box.style("border", "3px solid #111");
   box.style("border-radius", "12px");
   box.style("box-sizing", "border-box");
-  box.style("z-index", "0"); // ✅ 在最底层
+  box.style("z-index", "0"); // 在最底层
 
-  // ✅ 也用 uiBaseX 偏移
+  // 也用 uiBaseX 偏移
   box.position(uiBaseX + relX, relY);
   box.size(w, h);
 
-  // ✅ 记录：之后窄屏时用来居中
+  // 记录：之后窄屏时用来居中
   groupBoxes.push({ box, relX, relY });
 
   return box;
@@ -478,13 +475,13 @@ function createUI() {
 
   // 用抽屉滚动 保留
   uiContainer.style("overflow-y", "visible");
-  uiContainer.style("overflow-x", "visible"); // ✅ 宽屏不裁切
+  uiContainer.style("overflow-x", "visible"); // 宽屏不裁切
   uiContainer.style("-webkit-overflow-scrolling", "touch");
 
-  // ✅ 每次重建 UI 先清空记录，避免旧框/旧元素残留导致位置错乱
+  // 每次重建 UI 先清空记录，避免旧框/旧元素残留导致位置错乱
   uiElements = [];
   groupBoxes = [];
-  applyUIBaseX(4); // ✅ 宽屏默认整体左边距（调宽屏贴左/更靠右）
+  applyUIBaseX(4); // 宽屏默认整体左边距（调宽屏贴左/更靠右）
 
   // ===== 可调参数（改间距）=====
   const BOX_PAD_Y = 12; // 框内上下留白（越大越松）
@@ -498,7 +495,7 @@ function createUI() {
   const RIGHT_COL_X = BOX_W + GROUP_GAP + RIGHT_COL_SHIFT; //导出组往右移
 
   UI_RIGHT_COL_X = RIGHT_COL_X;
-  UI_PANEL_W = UI_RIGHT_COL_X + BOX_W + 20; // ✅ 右侧安全留白
+  UI_PANEL_W = UI_RIGHT_COL_X + BOX_W + 20; // 右侧安全留白
 
   uiContainer.style("width", UI_PANEL_W + "px");
   // ===== y 从 0 开始往下排 =====
@@ -549,7 +546,7 @@ function createUI() {
   let yTools = headGroup.contentTop; // 右列自己的 y 游标
   yTools += TITLE_TO_CONTROL_Y;
 
-  // ✅ 随机按钮放进 headGroup 右列
+  // 随机按钮放进 headGroup 右列
   randBtn = createButton("随机 Random");
   randBtn.mousePressed(onRandomPressed);
   styleSecondaryButton(randBtn, 108);
@@ -653,7 +650,7 @@ function createUI() {
   createUISectionTitle("鞋子颜色 Shoes Color (RGB)", x, y);
   y += 30;
 
-  // ✅ 记录三条滑条开始的 y，用于把右侧组件对齐到同一高度
+  // 记录三条滑条开始的 y，用于把右侧组件对齐到同一高度
   const sliderStartY = y;
 
   // R
@@ -683,14 +680,14 @@ function createUI() {
   registerUI(bSlider, x, y);
   y += 30;
 
-  // ✅ 右侧：颜色预览框（放在三条滑条右边）
-  const RGB_BOX_X = x + 170; // ✅ 改这个：越大越往右
+  // 右侧：颜色预览框
+  const RGB_BOX_X = x + 170; // 越大越往右
 
-  const SWATCH_W = 36; // ✅ 预览框宽度
-  const SWATCH_H = 36; // ✅ 预览框高度
+  const SWATCH_W = 36; // 预览框宽度
+  const SWATCH_H = 36; // 预览框高度
 
-  const INPUT_W = 100; // ✅ 输入框宽度
-  const INPUT_H = 34; // ✅ 输入框高度
+  const INPUT_W = 100; // 输入框宽度
+  const INPUT_H = 34; // 输入框高度
 
   rgbSwatch = createDiv(""); // 预览框（显示颜色 + 文字）
   rgbSwatch.style("border", "3px solid #111");
@@ -717,7 +714,7 @@ function createUI() {
   rgbInput.style("text-align", "center");
   registerUI(rgbInput, RGB_BOX_X, sliderStartY + SWATCH_H + 10);
 
-  // ✅ 用户输入 -> 同步鞋子颜色 + 三条滑条
+  // 用户输入 -> 同步鞋子颜色 + 三条滑条
   rgbInput.changed(() => {
     const raw = (rgbInput.value() || "").trim();
     const parts = raw.split(/[\s,\/]+/).filter(Boolean);
@@ -730,7 +727,7 @@ function createUI() {
     }
   });
 
-  // ✅ 初始化一次显示
+  // 初始化一次显示
   updateRGBUI();
 
   y = max(y, sliderStartY + SWATCH_H + INPUT_H);
@@ -757,13 +754,13 @@ function createUI() {
   createUISectionTitle("旋转 Rotate", x, y);
   y += TITLE_TO_CONTROL_Y;
 
-  // ✅ 0 在最左；范围 0~360
+  // 0 在最左；范围 0~360
   rotSlider = createSlider(0, 360, ((userImgRot % 360) + 360) % 360, 1);
   rotSlider.input(() => {
     userImgRot = rotSlider.value() % 360; // 保持在 0~360
   });
   registerUI(rotSlider, x, y);
-  // ✅ 只留一点点底部呼吸空间
+  // 底部空间
   const PLACE_BOTTOM_PAD = 28;
   y += PLACE_BOTTOM_PAD;
 
@@ -826,7 +823,7 @@ function createUI() {
   yy += 32;
 
   // ---- 右列按钮排布参数 ----
-  const EXPORT_BTN_NARROW = 166; // ✅ 调这个：越大越窄
+  const EXPORT_BTN_NARROW = 166; // 越大越窄
   const BTN_W = exportGroup.boxW - BOX_PAD_X * 2 - EXPORT_BTN_NARROW; //三个按钮宽度
 
   // Head
@@ -854,7 +851,7 @@ function createUI() {
   // 第三行：人物+卡片（做成一整行按钮）
   exportCardComboBtn = createButton("人物+卡片 Character+Card");
   exportCardComboBtn.mousePressed(() => {
-    exportCardPNG(); // ✅ 按当前下拉框 exportFormat 执行
+    exportCardPNG(); // 按当前下拉框 exportFormat 执行
   });
 
   // 右列整行宽度：用 COL_W 减去左右 padding（左右各 BOX_PAD_X）
@@ -864,7 +861,7 @@ function createUI() {
 
   yy += EXPORT_BTN_ROW_GAP;
 
-  const EXPORT_BOX_BOTTOM_PAD = 12; // ✅ 导出UI的框架底部长度（px）
+  const EXPORT_BOX_BOTTOM_PAD = 12; // 导出UI的框架底部长度（px）
   yy += EXPORT_BOX_BOTTOM_PAD;
 
   exportGroup.yRef.set(yy);
@@ -872,10 +869,10 @@ function createUI() {
 
   if (!isMobileNow) {
     yRight = yR;
-    y = savedLeftY; // ✅ 恢复左列 y（左列下面不需要变）
+    y = savedLeftY; // 恢复左列 y）
   }
 
-  // ✅ 计算 UI 实际内容高度（重要：否则 uiContainer 高度=0，UI 会“消失”）
+  // 计算 UI 实际内容高度（重要：否则 uiContainer 高度=0，UI 会“消失”）
   // y 是左列最终的游标；yRight 是右列最终的游标（宽屏两列时）
   uiContentH = Math.ceil(Math.max(y, yRight, 1));
 
@@ -933,7 +930,7 @@ function styleArrowButton(btn) {
 function styleExportButton(btn, isMobile, wOverride = null) {
   const w = wOverride != null ? wOverride : isMobile ? 88 : 84;
 
-  // ✅ 统一样式：白底黑字 + hover 反色（和上传/删除同）
+  // 统一样式：白底黑字 + hover 反色（和上传/删除同）
   styleSecondaryButton(btn, w);
 }
 
@@ -977,7 +974,7 @@ function styleSecondaryButton(btn, w) {
 
 function styleExportSelect(sel, isMobile) {
   sel.style("height", isMobile ? "30px" : "32px");
-  sel.style("width", isMobile ? "120px" : "114px"); // ✅ 下拉框宽度
+  sel.style("width", isMobile ? "120px" : "114px"); // 下拉框宽度
   sel.style("padding", "0 5px");
   sel.style("border", "3px solid #111");
   sel.style("border-radius", "8px");
@@ -1067,11 +1064,11 @@ function randomizeAvatar() {
   currentTop = floor(random(TOP_COUNT));
   currentBottom = floor(random(BOTTOM_COUNT));
   currentShoes = floor(random(SHOES_COUNT));
-  // ✅ 随机鞋子颜色（RGB）
+  // 随机鞋子颜色（RGB）
   shoeR = floor(random(256));
   shoeG = floor(random(256));
   shoeB = floor(random(256));
-  // ✅ 同步滑条 UI
+  // 同步滑条 UI
   if (rSlider) rSlider.value(shoeR);
   if (gSlider) gSlider.value(shoeG);
   if (bSlider) bSlider.value(shoeB);
@@ -1218,7 +1215,7 @@ function layoutUI() {
 
   const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
 
-  // ✅ 断点切换时重建 UI：让导出组在窄屏变成单列
+  // 断点切换时重建 UI：让导出组在窄屏变成单列
   if (lastIsMobile === null) lastIsMobile = isMobile;
 
   if (isMobile !== lastIsMobile) {
@@ -1232,7 +1229,7 @@ function layoutUI() {
     else drawerHandle.hide();
   }
 
-  // ✅ 每帧/每次布局都按当前模式刷新导出控件尺寸
+  // 每帧/每次布局都按当前模式刷新导出控件尺寸
   if (exportFormatSelect) styleExportSelect(exportFormatSelect, isMobile);
 
   if (exportCardComboBtn) {
@@ -1253,7 +1250,7 @@ function layoutUI() {
     applyUIBaseX(centeredBaseX);
 
     applyMobileDrawerLayout(drawerW, drawerH);
-    return; // ✅ 窄屏做完就结束
+    return; // 窄屏做完就结束
   }
 
   // ========== 宽屏：正常右侧面板（禁用抽屉） ==========
@@ -1279,7 +1276,7 @@ function layoutUI() {
   let panelY = avatarCenterY - scaledUIH / 2;
   panelY = constrain(panelY, margin, height - scaledUIH - margin);
 
-  // ✅ 关键：X 做 clamp，保证 UI 不会跑到画布左侧去盖住预览
+  // 关键：X 做 clamp，保证 UI 不会跑到画布左侧去盖住预览
   const minX = avatarRightScreen + margin; // 最左：至少在角色右侧
   const maxX = width - UI_PANEL_W * uiScale - margin; // 最右：贴右边距
   let panelX = maxX; // 默认贴右
@@ -1289,7 +1286,7 @@ function layoutUI() {
     panelX = constrain(desiredX, minX, maxX);
   }
 
-  // ✅ 最终只用这一句收口
+  // 最终只用这一句收口
   applyDesktopPanelLayout(panelX, panelY, uiScale);
 }
 
@@ -1422,7 +1419,7 @@ function drawCheckerboard(x, y, w, h, cell = 18) {
 function drawCardEditor() {
   const r = getCardRect();
 
-  // ✅ 透明窗口棋盘格（在模板下）
+  // 透明窗口棋盘格（在模板下）
   drawCheckerboard(r.winX, r.winY, r.winW, r.winH, 18);
 
   // 先画人物（裁剪到透明窗口）——无论有没有 userImg 都要裁剪
@@ -1441,7 +1438,7 @@ function drawCardEditor() {
     image(uploadedAvatarImg, 0, 0);
     pop();
   } else {
-    // ✅ 实时捏脸角色
+    // 实时捏脸角色
     drawLiveAvatarPlaced(this);
   }
 
@@ -1465,7 +1462,7 @@ function exportAvatar(mode) {
   const centerX = isMobile ? BASE_W_MOBILE / 2 : AVATAR_CENTER_X;
 
   const isOutline = exportFormat === "png_outline";
-  const PAD = isOutline ? OUTLINE_PX : 0; // ✅ 仅白边模式留边距=白边宽度
+  const PAD = isOutline ? OUTLINE_PX : 0; // 仅白边模式留边距=白边宽度
 
   // ===== 逻辑坐标下的位置 =====
   const headX = centerX - HEAD_W / 2;
@@ -1661,7 +1658,7 @@ function addWhiteOutline(srcPg, radiusPx) {
     }
   }
 
-  // ✅ 关键优化：只遍历不透明像素，然后把周围透明像素标成白色
+  // 关键优化：只遍历不透明像素，然后把周围透明像素标成白色
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const idx = 4 * (y * w + x);
@@ -1757,7 +1754,7 @@ function moveUserImgDrag(screenX, screenY, limitToWin) {
   let nx = m.x - dragDX;
   let ny = m.y - dragDY;
 
-  // ✅ 窄屏触屏：强制把中心点限制在透明窗口内，避免拖到外面找不回来
+  // 窄屏触屏：强制把中心点限制在透明窗口内，避免拖到外面找不回来
   if (limitToWin) {
     nx = constrain(nx, r.winX, r.winX + r.winW);
     ny = constrain(ny, r.winY, r.winY + r.winH);
@@ -1768,7 +1765,7 @@ function moveUserImgDrag(screenX, screenY, limitToWin) {
 }
 
 function mousePressed() {
-  // ✅ 窄屏不走 mouse（触屏用 touch* 处理）
+  // 窄屏不走 mouse（触屏用 touch* 处理）
   if (width <= WIDE_SCREEN_BREAKPOINT) return;
 
   startUserImgDrag(mouseX, mouseY, false); // 桌面：卡片范围内可拖
@@ -1793,7 +1790,7 @@ function touchStarted() {
   if (!touches || touches.length === 0) return true;
   const t = touches[0];
 
-  // ✅ 只在透明窗口内允许开始拖拽
+  // 只在透明窗口内允许开始拖拽
   const started = startUserImgDrag(t.x, t.y, true);
 
   // started=true => 阻止默认（避免滚动），开始拖拽
@@ -1810,7 +1807,7 @@ function touchMoved() {
 
   moveUserImgDrag(t.x, t.y, true);
 
-  // ✅ 拖拽过程中阻止页面/抽屉滚动
+  // 拖拽过程中阻止页面/抽屉滚动
   return false;
 }
 
