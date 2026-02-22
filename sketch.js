@@ -8,7 +8,7 @@ let introOverlay = null;
 let introCard = null;
 let introBtn = null;
 
-let showIntro = true; // 需要每次都弹就 true；只弹一次可以配 localStorage（见下方）
+let showIntro = true; // 需要每次都弹就 true；只弹一次可以配 localStorage
 
 let uploadedAvatarImg = null;
 let drawerHandle = null;
@@ -43,7 +43,7 @@ const USER_IMG_SCALE_MAX = 1.8; // 缩放滑条的最大值
 let exportHeadBtn, exportHalfBtn, exportFullBtn;
 let exportCardComboBtn;
 
-let isDrawerOpen = true; // 默认打开（你也可以改成 false）
+let isDrawerOpen = true; // 默认打开
 let lastIsMobile = null; // 用来检测屏幕模式切换
 
 const MOBILE_DRAWER_H_RATIO = 0.4; // 手机抽屉占屏高度比例（0.35~0.5）
@@ -156,7 +156,7 @@ const AVATAR_HEAD_TOP_Y = 80;
 const CARD_ASPECT = 70 / 100;
 
 // 在左侧预览区 给透卡预留的最大高度（逻辑坐标）
-// 可以微调这两个数：越大，透卡在左侧显示越大
+// 可微调这两个数：越大，透卡在左侧显示越大
 const CARD_MAX_H = 620; // 逻辑高度
 const CARD_MAX_W = CARD_MAX_H * CARD_ASPECT;
 
@@ -272,7 +272,7 @@ function showIntroOverlay() {
   introOverlay.style("width", "100vw");
   introOverlay.style("height", "100vh");
   introOverlay.style("background", "rgba(0,0,0,0.55)"); // 半透明黑
-  introOverlay.style("z-index", "20000"); // 比你的 UI 高就行
+  introOverlay.style("z-index", "20000"); // 比UI高
   introOverlay.style("display", "flex");
   introOverlay.style("justify-content", "center");
 
@@ -323,7 +323,7 @@ function showIntroOverlay() {
   note.style("margin", "0 0 16px 0");
   note.style("line-height", "1.5");
 
-  // 这里放你的“更短引导页”说明（意大利语）
+  // 这里放更短引导页说明（意大利语）
   const guideHTML = `
 <div style="font-size:14px; opacity:0.95; line-height:1.55;">
   <b>游戏说明 / Guida rapida</b><br/><br/>
@@ -476,17 +476,17 @@ function createUI() {
     if (drawerHandle) drawerHandle.hide();
   }
 
-  // 如果你还在用抽屉滚动，这些保留没问题
+  // 用抽屉滚动 保留
   uiContainer.style("overflow-y", "visible");
   uiContainer.style("overflow-x", "visible"); // ✅ 宽屏不裁切
   uiContainer.style("-webkit-overflow-scrolling", "touch");
 
-  // ✅ 很关键：每次重建 UI 先清空记录，避免旧框/旧元素残留导致位置错乱
+  // ✅ 每次重建 UI 先清空记录，避免旧框/旧元素残留导致位置错乱
   uiElements = [];
   groupBoxes = [];
-  applyUIBaseX(4); // ✅ 宽屏默认整体左边距（你想调宽屏贴左/更靠右，就改这里）
+  applyUIBaseX(4); // ✅ 宽屏默认整体左边距（调宽屏贴左/更靠右）
 
-  // ===== 可调参数（你后续想改间距就改这几个）=====
+  // ===== 可调参数（改间距）=====
   const BOX_PAD_Y = 12; // 框内上下留白（越大越松）
   const BOX_PAD_X = 18; // 框内左边距（内容离框左边的距离）
   const GROUP_GAP = 18; // 框与框之间的距离（越大越松）
@@ -1262,10 +1262,10 @@ function layoutUI() {
   const margin = DESKTOP_MARGIN;
   const uiScale = 1;
 
-  // 角色绘制区的右边界（你原来就是 420*scaleFactor）
+  // 角色绘制区的右边界（原来是 420*scaleFactor）
   const avatarRightScreen = offsetX + 420 * scaleFactor;
 
-  // 计算 Y（保持你原来的思路）
+  // 计算 Y
   const headY = AVATAR_HEAD_TOP_Y;
   const topY = headY + HEAD_H - SEAM_FIX;
   const bottomY = topY + BODY_TOP_H - SEAM_FIX;
@@ -1389,7 +1389,7 @@ function getCardRect() {
   const isMobile = width <= WIDE_SCREEN_BREAKPOINT;
   const baseW = isMobile ? BASE_W_MOBILE : BASE_W_DESKTOP;
 
-  // 卡片在左侧区域的中心点（你原来就这么定的风格）
+  // 卡片在左侧区域的中心点
   const cx = isMobile ? baseW / 2 : AVATAR_CENTER_X;
   const cy = 350; //
 
@@ -1497,7 +1497,7 @@ function exportAvatar(mode) {
     const left = Math.min(headX, topX);
     const top = headY;
     const right = Math.max(headX + HEAD_W, topX + BODY_TOP_W);
-    const bottom = bottomY; // 你之前为避免露出裤子这样写是对的
+    const bottom = bottomY; // 为避免露出裤子
 
     x = left - PAD;
     y = top - PAD;
